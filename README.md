@@ -61,7 +61,10 @@ PY
 - Landing screen:
   - `PLAY`
   - `DIFFICULTY` (cycle easy/medium/hard)
-  - `SETTINGS` (music/SFX sliders + mute)
+  - `SETTINGS` (music/SFX sliders + mute + fullscreen)
+- Fullscreen toggle:
+  - Settings panel `FULL: ON/OFF`
+  - Keyboard shortcut `F11` (or `Alt+Enter`)
 - Crack screen:
   - Giant up/down arrows for each dial
   - `TRY!`, `HINT`, `LANDING`, `LESSON`

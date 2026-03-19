@@ -72,14 +72,16 @@ class BaseScene:
 class LandingScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self.play_button = Button((300, 320, 300, 96), "PLAY", (255, 135, 40), (255, 170, 70))
-        self.diff_button = Button((300, 430, 300, 80), "DIFFICULTY", (91, 163, 255), (117, 184, 255), pulse=False)
-        self.settings_button = Button((300, 520, 300, 66), "SETTINGS", (167, 121, 251), (188, 145, 255), pulse=False)
-        self.mute_button = Button((672, 472, 180, 58), "MUTE: OFF", (215, 106, 80), (238, 128, 98), pulse=False)
+        self.play_button = Button((300, 325, 300, 96), "PLAY", (255, 135, 40), (255, 170, 70))
+        self.diff_button = Button((300, 434, 300, 74), "MODE", (91, 163, 255), (117, 184, 255), pulse=False)
+        self.settings_button = Button((300, 518, 300, 58), "SETTINGS", (167, 121, 251), (188, 145, 255), pulse=False)
+        self.mute_button = Button((0, 0, 220, 60), "MUTE: OFF", (215, 106, 80), (238, 128, 98), pulse=False)
+        self.fullscreen_button = Button((0, 0, 220, 60), "FULL: OFF", (84, 145, 220), (105, 167, 240), pulse=False)
         self.settings_open = False
 
-        self.music_slider = Slider((562, 356, 250, 26), "Music", initial=self.game.audio.music_volume)
-        self.sfx_slider = Slider((562, 420, 250, 26), "SFX", initial=self.game.audio.sfx_volume)
+        self.music_slider = Slider((0, 0, 320, 28), "Music", initial=self.game.audio.music_volume)
+        self.sfx_slider = Slider((0, 0, 320, 28), "SFX", initial=self.game.audio.sfx_volume)
+        self.settings_panel = pygame.Rect(210, 190, 480, 380)
 
         self.parent_rect = pygame.Rect(PARENT_HOTSPOT)
         self.parent_hold = 0.0
@@ -95,15 +97,52 @@ class LandingScene(BaseScene):
             mute=self.game.audio.muted,
             music_volume=self.music_slider.value,
             sfx_volume=self.sfx_slider.value,
+            fullscreen=self.game.fullscreen,
         )
+
+    def _layout_settings_controls(self):
+        panel = self.settings_panel
+        self.music_slider.rect = pygame.Rect(panel.left + 76, panel.top + 110, 320, 28)
+        self.sfx_slider.rect = pygame.Rect(panel.left + 76, panel.top + 190, 320, 28)
+        self.mute_button.rect = pygame.Rect(panel.left + 130, panel.top + 245, 220, 60)
+        self.fullscreen_button.rect = pygame.Rect(panel.left + 130, panel.top + 310, 220, 50)
+
+    def _truncate_to_width(self, text, max_width):
+        if self.game.fonts.tiny.size(text)[0] <= max_width:
+            return text
+        trimmed = text
+        while trimmed and self.game.fonts.tiny.size(trimmed + "...")[0] > max_width:
+            trimmed = trimmed[:-1]
+        return (trimmed + "...") if trimmed else "..."
 
     def handle_event(self, event):
         if self.settings_open:
+            self._layout_settings_controls()
             handled = self.music_slider.handle_event(event) or self.sfx_slider.handle_event(event)
             if handled:
                 self._sync_audio_settings()
+                return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.settings_open:
+                if self.mute_button.clicked(event.pos):
+                    self.game.audio.set_muted(not self.game.audio.muted)
+                    self._sync_audio_settings()
+                    self.game.audio.play_sfx("click")
+                    return
+
+                if self.fullscreen_button.clicked(event.pos):
+                    self.game.toggle_fullscreen()
+                    self._sync_audio_settings()
+                    self.game.audio.play_sfx("click")
+                    return
+
+                if not self.settings_panel.collidepoint(event.pos):
+                    self.settings_open = False
+                    self.game.audio.play_sfx("click")
+                    return
+                return
+
             if self.parent_rect.collidepoint(event.pos):
                 self.parent_holding = True
                 self.parent_hold = 0.0
@@ -123,12 +162,6 @@ class LandingScene(BaseScene):
                 self.game.audio.play_sfx("click")
                 return
 
-            if self.settings_open and self.mute_button.clicked(event.pos):
-                self.game.audio.set_muted(not self.game.audio.muted)
-                self._sync_audio_settings()
-                self.game.audio.play_sfx("click")
-                return
-
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             self.parent_holding = False
             self.parent_hold = 0.0
@@ -139,7 +172,7 @@ class LandingScene(BaseScene):
                 self.parent_hold = 0.0
 
     def update(self, dt):
-        if self.parent_holding and pygame.mouse.get_pressed()[0] and self.parent_rect.collidepoint(pygame.mouse.get_pos()):
+        if self.parent_holding and pygame.mouse.get_pressed()[0] and self.game.mouse_inside_canvas and self.parent_rect.collidepoint(self.game.mouse_virtual_pos):
             self.parent_hold += dt
             if self.parent_hold >= PARENT_HOLD_SECONDS:
                 self.parent_holding = False
@@ -149,6 +182,9 @@ class LandingScene(BaseScene):
                 return
 
         self.mute_button.label = "MUTE: ON" if self.game.audio.muted else "MUTE: OFF"
+        self.fullscreen_button.label = "FULL: ON" if self.game.fullscreen else "FULL: OFF"
+        cfg = self.game.difficulty_manager.get_config(self.game.current_difficulty)
+        self.diff_button.label = f"MODE: {cfg.label.upper()}"
 
     def draw(self, screen):
         t = pygame.time.get_ticks() / 1000.0
@@ -170,25 +206,24 @@ class LandingScene(BaseScene):
         )
 
         draw_text_outline(screen, "Pirate Password Chest", self.game.fonts.huge, YELLOW, BLACK, (450, 208), center=True)
-        draw_text_outline(screen, "Arrr You Safe?", self.game.fonts.big, WHITE, BLACK, (450, 262), center=True)
+        draw_text_outline(screen, "Arrr You Safe?", self.game.fonts.med, WHITE, BLACK, (450, 296), center=True)
 
         self.draw_speech_bubble("Ahoy! Protect your treasure with strong passwords, matey!", tail_x=628, tail_y=168)
 
-        self.play_button.draw(screen, self.game.fonts, t)
-        self.diff_button.draw(screen, self.game.fonts, t)
-        self.settings_button.draw(screen, self.game.fonts, t)
-
-        cfg = self.game.difficulty_manager.get_config(self.game.current_difficulty)
-        draw_text_outline(screen, f"Mode: {cfg.label} ({cfg.length} chars)", self.game.fonts.small, CYAN, BLACK, (450, 487), center=True)
+        self.play_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.diff_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.settings_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
         stats = self.game.save_manager.stats
-        draw_text_outline(screen, f"Stars: {stats['total_stars']}", self.game.fonts.small, WHITE, BLACK, (130, 548), center=True)
-
-        if stats["last_reward"]:
-            badge_rect = pygame.Rect(20, 468, 90, 90)
-            self.game.sprite_manager.draw_badge_icon(screen, badge_rect)
-            draw_text_outline(screen, "Last Sticker:", self.game.fonts.tiny, YELLOW, BLACK, (170, 500), center=False)
-            draw_text_outline(screen, stats["last_reward"], self.game.fonts.tiny, WHITE, BLACK, (170, 530), center=False)
+        info_panel = pygame.Rect(18, 456, 262, 132)
+        draw_panel(screen, info_panel, bg_color=(39, 70, 132), border_color=(188, 214, 255))
+        badge_rect = pygame.Rect(32, 476, 72, 72)
+        self.game.sprite_manager.draw_badge_icon(screen, badge_rect)
+        draw_text_outline(screen, f"Stars: {stats['total_stars']}", self.game.fonts.small, WHITE, BLACK, (120, 490), center=False)
+        draw_text_outline(screen, "Last Sticker:", self.game.fonts.tiny, YELLOW, BLACK, (120, 526), center=False)
+        reward = stats["last_reward"] if stats["last_reward"] else "None yet"
+        reward = self._truncate_to_width(reward, 150)
+        draw_text_outline(screen, reward, self.game.fonts.tiny, WHITE, BLACK, (120, 554), center=False)
 
         # Hidden parent hotspot hint only while holding.
         if self.parent_holding:
@@ -199,12 +234,17 @@ class LandingScene(BaseScene):
             pygame.draw.rect(screen, GREEN, bar, border_radius=4)
 
         if self.settings_open:
-            panel = pygame.Rect(544, 300, 336, 250)
+            self._layout_settings_controls()
+            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            overlay.fill((6, 16, 35, 150))
+            screen.blit(overlay, (0, 0))
+            panel = self.settings_panel
             draw_panel(screen, panel, bg_color=(34, 58, 98), border_color=(188, 214, 255))
             draw_text_outline(screen, "Settings", self.game.fonts.med, WHITE, BLACK, (panel.centerx, panel.top + 34), center=True)
             self.music_slider.draw(screen, self.game.fonts)
             self.sfx_slider.draw(screen, self.game.fonts)
-            self.mute_button.draw(screen, self.game.fonts, t)
+            self.mute_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+            self.fullscreen_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
 
 class CrackScene(BaseScene):
@@ -432,32 +472,35 @@ class CrackScene(BaseScene):
 
         self.draw_speech_bubble(self.parrot_line, tail_x=560, tail_y=168)
 
-        draw_text_outline(screen, f"Crack the {self.config.length}-char code!", self.game.fonts.big, YELLOW, BLACK, (450, 196), center=True)
-        draw_text_outline(screen, f"Difficulty: {self.config.label}", self.game.fonts.small, CYAN, BLACK, (450, 236), center=True)
+        draw_text_outline(screen, f"Crack the {self.config.length}-char code!", self.game.fonts.big, YELLOW, BLACK, (450, 198), center=True)
+        draw_text_outline(screen, f"Difficulty: {self.config.label}", self.game.fonts.small, CYAN, BLACK, (450, 274), center=True)
 
         for dial in self.dials:
             dial.draw(screen, self.game.fonts)
 
-        self.try_button.draw(screen, self.game.fonts, t)
-        self.hint_button.draw(screen, self.game.fonts, t)
-        self.home_button.draw(screen, self.game.fonts, t)
+        self.try_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.hint_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.home_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
         if self.win:
-            self.lesson_button.draw(screen, self.game.fonts, t)
+            self.lesson_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+
+        tries_rect = pygame.Rect(666, 250, 212, 60)
+        draw_panel(screen, tries_rect, bg_color=(36, 64, 112), border_color=(188, 214, 255))
+        draw_text_outline(screen, f"Tries: {self.attempts}", self.game.fonts.small, YELLOW, BLACK, tries_rect.center, center=True)
 
         hint_text = " ".join(v if v is not None else "?" for v in self.revealed)
-        draw_text_outline(screen, f"Hints: {hint_text}", self.game.fonts.small, WHITE, BLACK, (450, 510), center=True)
-        draw_text_outline(screen, f"Tries: {self.attempts}", self.game.fonts.small, YELLOW, BLACK, (778, 208), center=True)
+        draw_text_outline(screen, f"Hints: {hint_text}", self.game.fonts.tiny, WHITE, BLACK, (450, 496), center=True)
 
         # Weak meter
-        x, y, w, h = 300, 542, 300, 38
+        x, y, w, h = 300, 546, 300, 34
         pygame.draw.rect(screen, (238, 224, 203), (x - 5, y - 5, w + 10, h + 10), border_radius=12)
         pygame.draw.rect(screen, BLACK, (x - 5, y - 5, w + 10, h + 10), width=3, border_radius=12)
         pygame.draw.rect(screen, (120, 50, 50), (x, y, w, h), border_radius=10)
         fill = int(w * self.weak_meter)
         if fill > 0:
             pygame.draw.rect(screen, RED, (x, y, fill, h), border_radius=10)
-        draw_text_outline(screen, "Weak Password Meter", self.game.fonts.tiny, YELLOW, BLACK, (450, y - 16), center=True)
+        draw_text_outline(screen, "Weak Password Meter", self.game.fonts.tiny, YELLOW, BLACK, (450, y - 14), center=True)
 
         self.draw_particles(self.treasure)
         self.draw_particles(self.sparkles)
@@ -507,8 +550,8 @@ class LessonScene(BaseScene):
         example = "Example: MyPirateIsland$42!"
         draw_text_outline(screen, example, self.game.fonts.small, DARK_BLUE, BLACK, (450, 430), center=True)
 
-        self.to_builder_button.draw(screen, self.game.fonts, t)
-        self.play_again_button.draw(screen, self.game.fonts, t)
+        self.to_builder_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.play_again_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
 
 class BuilderScene(BaseScene):
@@ -714,12 +757,12 @@ class BuilderScene(BaseScene):
             pygame.draw.rect(screen, GREEN, (x, y, fill, h), border_radius=14)
         draw_text_outline(screen, f"Strength: {self.strength}%", self.game.fonts.med, YELLOW, BLACK, (450, y + h // 2), center=True)
 
-        self.add_letter_button.draw(screen, self.game.fonts, t)
-        self.add_number_button.draw(screen, self.game.fonts, t)
-        self.add_symbol_button.draw(screen, self.game.fonts, t)
-        self.backspace_button.draw(screen, self.game.fonts, t)
-        self.clear_button.draw(screen, self.game.fonts, t)
-        self.finish_button.draw(screen, self.game.fonts, t)
+        self.add_letter_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.add_number_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.add_symbol_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.backspace_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.clear_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.finish_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
         if self.strength >= 100:
             draw_text_outline(screen, "TREASURE-SAFE PASSWORD!", self.game.fonts.med, GREEN, BLACK, (450, 520), center=True)
@@ -794,8 +837,8 @@ class ParentReportScene(BaseScene):
             draw_text_outline(screen, line, self.game.fonts.tiny, BLACK, WHITE, (450, y), center=False)
             y += 28
 
-        self.back_button.draw(screen, self.game.fonts, t)
-        self.clear_button.draw(screen, self.game.fonts, t)
+        self.back_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+        self.clear_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
         if self.confirm:
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -806,5 +849,5 @@ class ParentReportScene(BaseScene):
             draw_panel(screen, box, bg_color=(255, 247, 240), border_color=(120, 70, 60))
             draw_text_outline(screen, "Clear all progress?", self.game.fonts.med, RED, BLACK, (450, 292), center=True)
             draw_text_outline(screen, "Settings (mute/volume) will stay saved.", self.game.fonts.tiny, BLACK, WHITE, (450, 322), center=True)
-            self.confirm_yes.draw(screen, self.game.fonts, t)
-            self.confirm_no.draw(screen, self.game.fonts, t)
+            self.confirm_yes.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+            self.confirm_no.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)

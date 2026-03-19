@@ -73,11 +73,11 @@ class Button:
         self.visible = True
         self.enabled = True
 
-    def draw(self, surface, fonts: FontBook, t):
+    def draw(self, surface, fonts: FontBook, t, mouse_pos=None):
         if not self.visible:
             return
 
-        mouse = pygame.mouse.get_pos()
+        mouse = mouse_pos if mouse_pos is not None else pygame.mouse.get_pos()
         hovered = self.rect.collidepoint(mouse)
         color = self.hover if hovered and self.enabled else self.color
 

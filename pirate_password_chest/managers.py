@@ -56,6 +56,7 @@ class SaveManager:
                 "mute": False,
                 "music_volume": 0.65,
                 "sfx_volume": 0.85,
+                "fullscreen": False,
             },
             "stats": {
                 "rounds_played": {"easy": 0, "medium": 0, "hard": 0},
@@ -112,6 +113,7 @@ class SaveManager:
         data["settings"]["mute"] = bool(settings.get("mute", data["settings"]["mute"]))
         data["settings"]["music_volume"] = self._clamp01(float(settings.get("music_volume", data["settings"]["music_volume"])))
         data["settings"]["sfx_volume"] = self._clamp01(float(settings.get("sfx_volume", data["settings"]["sfx_volume"])))
+        data["settings"]["fullscreen"] = bool(settings.get("fullscreen", data["settings"]["fullscreen"]))
 
         for diff in ("easy", "medium", "hard"):
             data["stats"]["rounds_played"][diff] = int(stats.get("rounds_played", {}).get(diff, 0))
@@ -168,13 +170,21 @@ class SaveManager:
     def stats(self):
         return self.data["stats"]
 
-    def set_settings(self, mute: bool | None = None, music_volume: float | None = None, sfx_volume: float | None = None):
+    def set_settings(
+        self,
+        mute: bool | None = None,
+        music_volume: float | None = None,
+        sfx_volume: float | None = None,
+        fullscreen: bool | None = None,
+    ):
         if mute is not None:
             self.settings["mute"] = bool(mute)
         if music_volume is not None:
             self.settings["music_volume"] = self._clamp01(float(music_volume))
         if sfx_volume is not None:
             self.settings["sfx_volume"] = self._clamp01(float(sfx_volume))
+        if fullscreen is not None:
+            self.settings["fullscreen"] = bool(fullscreen)
         self.save()
 
     def record_builder_strength(self, strength: int):
