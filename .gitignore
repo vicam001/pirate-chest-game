@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Game runtime data
+data/progress.json
+data/*.corrupt.*.json

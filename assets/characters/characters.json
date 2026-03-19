@@ -1,0 +1,75 @@
+{
+  "style": "Kid-friendly semi-realistic puppet pirate portraits with felt textures, stitched details, big expressive eyes and warm Disney-like lighting",
+  "target_audience": "Children around 7 years old",
+  "creative_direction": {
+    "inspiration": [
+      "Classic pirate comedy adventure games",
+      "Puppet movie energy and theatrical expressions"
+    ],
+    "safety": "Designed to feel adventurous, funny and reassuring; no horror cues."
+  },
+  "usage": {
+    "format": "svg",
+    "canvas": "1024x1024",
+    "background": "circular portrait backdrop built in; easy to crop",
+    "license_note": "Original in-repo characters. Inspired mood only; no direct copies of external IP."
+  },
+  "characters": [
+    {
+      "id": "captain-brinebeard",
+      "name": "Captain Brinebeard",
+      "role": "Captain",
+      "persona": "Big-hearted loudmouth who makes every mission feel epic",
+      "file": "assets/characters/captain-brinebeard.svg",
+      "tags": ["beard", "tricorn", "gold-earring", "leader", "friendly"]
+    },
+    {
+      "id": "first-mate-laughing-lucy",
+      "name": "First Mate Laughing Lucy",
+      "role": "First Mate",
+      "persona": "Brave strategist with unstoppable laughter",
+      "file": "assets/characters/first-mate-laughing-lucy.svg",
+      "tags": ["bandana", "striped", "confident", "heroic", "kind"]
+    },
+    {
+      "id": "professor-plankton",
+      "name": "Professor Plankton",
+      "role": "Navigator",
+      "persona": "Map genius who turns clues into fun stories",
+      "file": "assets/characters/professor-plankton.svg",
+      "tags": ["monocle", "hat-feather", "bookish", "mustache", "inventor"]
+    },
+    {
+      "id": "pegleg-paco",
+      "name": "Pegleg Paco",
+      "role": "Rogue",
+      "persona": "Playful trickster who loves harmless pranks",
+      "file": "assets/characters/pegleg-paco.svg",
+      "tags": ["eyepatch", "grin", "scoundrel", "green-coat", "comic"]
+    },
+    {
+      "id": "cooky-morgan",
+      "name": "Cooky Morgan",
+      "role": "Ship Cook",
+      "persona": "Chaotic chef who celebrates every win with snacks",
+      "file": "assets/characters/cooky-morgan.svg",
+      "tags": ["cook", "spoon", "bandana", "wild", "warm"]
+    },
+    {
+      "id": "young-deckhand-nina",
+      "name": "Young Deckhand Nina",
+      "role": "Deckhand",
+      "persona": "Curious helper who always spots hidden clues",
+      "file": "assets/characters/young-deckhand-nina.svg",
+      "tags": ["young", "bold-hat", "optimistic", "adventurer"]
+    },
+    {
+      "id": "ghostly-gibbs",
+      "name": "Ghostly Gibbs",
+      "role": "Ghost Guide",
+      "persona": "Silly ghost mentor with gentle spooky jokes",
+      "file": "assets/characters/ghostly-gibbs.svg",
+      "tags": ["ghost", "glow", "goofy", "safe", "guide"]
+    }
+  ]
+}

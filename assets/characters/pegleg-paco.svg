@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Pegleg Paco</title>
+  <desc id="desc">Playful trickster pirate with a soft eye patch, big grin and felt-textured green jacket.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="34%" r="70%">
+      <stop offset="0%" stop-color="#ffd7e5"/>
+      <stop offset="100%" stop-color="#df5c88"/>
+    </radialGradient>
+    <linearGradient id="coat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ab84b"/>
+      <stop offset="100%" stop-color="#4a7b2e"/>
+    </linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f6cda4"/>
+      <stop offset="100%" stop-color="#e7b186"/>
+    </linearGradient>
+    <filter id="felt" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.86" numOctaves="2" seed="17" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0" result="mono"/>
+      <feComponentTransfer in="mono" result="alphaNoise"><feFuncA type="table" tableValues="0 0.08"/></feComponentTransfer>
+      <feBlend in="SourceGraphic" in2="alphaNoise" mode="multiply"/>
+    </filter>
+    <filter id="softshadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#7b1d3e" flood-opacity="0.34"/>
+    </filter>
+  </defs>
+
+  <circle cx="512" cy="512" r="470" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="458" fill="none" stroke="#ffd9a5" stroke-width="14" stroke-dasharray="7 16"/>
+
+  <g filter="url(#softshadow)">
+    <ellipse cx="512" cy="792" rx="304" ry="168" fill="url(#coat)" filter="url(#felt)"/>
+    <path d="M322 820 Q512 762 702 820" stroke="#dcedc8" stroke-width="10" stroke-linecap="round" stroke-dasharray="1 17"/>
+
+    <ellipse cx="512" cy="560" rx="244" ry="222" fill="url(#skin)" filter="url(#felt)"/>
+
+    <path d="M296 436 Q512 294 728 436 Q712 330 640 278 Q582 236 512 248 Q442 236 384 278 Q312 330 296 436Z" fill="#2d211c"/>
+    <path d="M344 430 Q390 354 442 334 Q486 318 512 324 Q538 318 582 334 Q634 354 680 430" stroke="#47342b" stroke-width="18" fill="none" stroke-linecap="round"/>
+
+    <ellipse cx="612" cy="528" rx="38" ry="50" fill="#fffef8"/>
+    <circle cx="616" cy="532" r="17" fill="#13253f"/>
+    <circle cx="622" cy="522" r="7" fill="#fff"/>
+
+    <ellipse cx="416" cy="528" rx="56" ry="44" fill="#151515"/>
+    <path d="M360 506 Q416 464 472 506" stroke="#151515" stroke-width="12" fill="none" stroke-linecap="round"/>
+
+    <ellipse cx="512" cy="592" rx="25" ry="18" fill="#d8835b"/>
+    <path d="M384 660 Q512 754 640 660" fill="#8d2b1f"/>
+    <rect x="430" y="664" width="164" height="36" rx="11" fill="#fff2dc"/>
+    <line x1="462" y1="664" x2="462" y2="700" stroke="#d5b18f" stroke-width="3"/>
+    <line x1="496" y1="664" x2="496" y2="700" stroke="#d5b18f" stroke-width="3"/>
+    <line x1="530" y1="664" x2="530" y2="700" stroke="#d5b18f" stroke-width="3"/>
+    <line x1="564" y1="664" x2="564" y2="700" stroke="#d5b18f" stroke-width="3"/>
+
+    <circle cx="314" cy="566" r="48" fill="url(#skin)"/>
+    <circle cx="710" cy="566" r="48" fill="url(#skin)"/>
+    <path d="M282 586 l-66 30" stroke="#dbd4c0" stroke-width="16" stroke-linecap="round"/>
+  </g>
+</svg>
