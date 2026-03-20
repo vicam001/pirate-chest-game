@@ -4,11 +4,12 @@ A colorful, kid-friendly Pygame mini-adventure that teaches password safety thro
 
 ## Features in v2
 
-- Scene-based game flow: Landing -> Crack -> Lesson -> Builder -> Parent Report
+- Scene-based game flow: Voyage Intro -> Landing -> Crack -> Lesson -> Builder -> Parent Report
 - Difficulty progression:
-  - Easy: 4-character numeric
-  - Medium: 6-character numeric
-  - Hard: 8-character mixed (`A-Z`, `0-9`, `!@#$`)
+  - Easy: 1-digit numeric
+  - Medium: 2-digit numeric
+  - Hard: 3-digit numeric
+  - Expert: 4-digit numeric
 - Real audio pipeline with fallback generated tones if audio files are missing
 - Sprite-first animation pipeline with fallback procedural rendering
 - Local progress save with stars, stickers, and round history
@@ -58,9 +59,13 @@ PY
 ## Controls
 
 - Mouse-only UI with large hitboxes
+- Voyage intro screen (shown on game launch):
+  - Animated map route with galleon + shark companion
+  - Story checkpoints with choice prompts
+  - `SKIP` and `DISEMBARK!`
 - Landing screen:
   - `PLAY`
-  - `DIFFICULTY` (cycle easy/medium/hard)
+  - `DIFFICULTY` (cycle easy/medium/hard/expert)
   - `SETTINGS` (music/SFX sliders + mute + fullscreen)
 - Fullscreen toggle:
   - Settings panel `FULL: ON/OFF`

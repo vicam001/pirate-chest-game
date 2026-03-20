@@ -23,44 +23,57 @@ class DifficultyManager:
             "easy": DifficultyConfig(
                 key="easy",
                 label="Easy",
-                length=4,
+                length=1,
                 symbols="0123456789",
-                description="4-digit lock. Fast to crack.",
+                description="1-digit lock. Super easy to crack.",
             ),
             "medium": DifficultyConfig(
                 key="medium",
                 label="Medium",
-                length=6,
+                length=2,
                 symbols="0123456789",
-                description="6-digit lock. Better, but still numbers only.",
+                description="2-digit lock. A bit stronger.",
             ),
             "hard": DifficultyConfig(
                 key="hard",
                 label="Hard",
-                length=8,
-                symbols="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$",
-                description="8-char mixed lock. Much safer.",
+                length=3,
+                symbols="0123456789",
+                description="3-digit lock. Stronger again.",
+            ),
+            "expert": DifficultyConfig(
+                key="expert",
+                label="Expert",
+                length=4,
+                symbols="0123456789",
+                description="4-digit lock. Toughest in this mode.",
             ),
         }
 
         self.tips = {
             "easy": [
-                "1234? Every pirate starts there!",
-                "Tiny 4-digit codes sink fast!",
-                "Short number codes are easy treasure.",
-                "Birthdays are pirate bait for hackers.",
+                "One digit? Any pirate can brute-force that!",
+                "Single-digit locks open in no time!",
+                "Shorter locks are always easier to crack.",
+                "Let's try a bigger lock next!",
             ],
             "medium": [
-                "6 digits is better, but still all numbers!",
-                "Numbers only means fewer possibilities.",
-                "Patterns like 112233 are still weak.",
-                "Longer helps, mixing helps even more!",
+                "Two digits is better than one!",
+                "More digits means more possibilities.",
+                "Keep climbing for stronger locks.",
+                "Every extra digit helps protect treasure.",
             ],
             "hard": [
-                "Now that is a bigger code space!",
-                "Letters, numbers, symbols: smart captain move!",
-                "Random mixed characters are hardest to guess.",
-                "Strong locks protect treasure and secrets.",
+                "Three digits makes guessing much harder!",
+                "Nice progress, captain.",
+                "Longer locks defend treasure better.",
+                "One more step to the toughest lock!",
+            ],
+            "expert": [
+                "Four digits: toughest chest in this adventure!",
+                "Now that is a much bigger code space.",
+                "Great work leveling up your lock strength.",
+                "Longer secrets keep pirates guessing.",
             ],
         }
 
@@ -86,10 +99,10 @@ class DifficultyManager:
         cfg = self.get_config(difficulty)
         space = self.code_space(difficulty)
         return [
-            f"You cracked a {cfg.length}-character lock.",
+            f"You cracked a {cfg.length}-digit lock.",
             f"Code space size: {space:,} possible combinations.",
-            "Strong passwords are long and mixed.",
-            "Use letters + numbers + symbols together.",
-            "Never use birthdays, names, or simple patterns.",
-            "A password phrase is easier to remember and safer.",
+            "Longer locks are stronger than short ones.",
+            "Each extra digit makes guessing harder.",
+            "Avoid simple patterns like 1111 or 1234.",
+            "Use long, mixed passwords for real accounts.",
         ]

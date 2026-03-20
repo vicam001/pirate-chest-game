@@ -104,7 +104,48 @@ def draw_background(surface, width, height, t, wave_phase):
     draw_palm(surface, 785, 398, 0.85, sway=-sway)
 
 
-def draw_chest_fallback(surface, center, t, open_amount=0.0, shake=0.0):
+def draw_spanish_gold_coin(surface, center, radius, t, stamp_phase=0.0):
+    cx, cy = int(center[0]), int(center[1])
+    radius = max(4, int(radius))
+    pygame.draw.circle(surface, (235, 174, 42), (cx, cy), radius)
+    pygame.draw.circle(surface, GOLD, (cx, cy), max(2, int(radius * 0.86)))
+    pygame.draw.circle(surface, (255, 233, 143), (cx, cy), max(1, int(radius * 0.58)))
+    pygame.draw.circle(surface, GOLD_DARK, (cx, cy), radius, width=max(1, radius // 6))
+    pygame.draw.circle(surface, (175, 114, 19), (cx, cy), max(2, int(radius * 0.38)), width=max(1, radius // 10))
+    pygame.draw.line(
+        surface,
+        GOLD_DARK,
+        (cx - int(radius * 0.2), cy - int(radius * 0.2)),
+        (cx + int(radius * 0.2), cy + int(radius * 0.2)),
+        max(1, radius // 9),
+    )
+    pygame.draw.line(
+        surface,
+        GOLD_DARK,
+        (cx - int(radius * 0.2), cy + int(radius * 0.2)),
+        (cx + int(radius * 0.2), cy - int(radius * 0.2)),
+        max(1, radius // 9),
+    )
+
+    glint_angle = t * 3.7 + stamp_phase
+    glint_x = cx + int(math.cos(glint_angle) * radius * 0.48)
+    glint_y = cy - int(radius * 0.42 + abs(math.sin(glint_angle * 1.2)) * radius * 0.14)
+    pygame.draw.circle(surface, WHITE, (glint_x, glint_y), max(1, radius // 5))
+
+
+def draw_chest_fallback(
+    surface,
+    center,
+    t,
+    open_amount=0.0,
+    shake=0.0,
+    lock_unlocked=False,
+    lock_drop=0.0,
+    show_coins=False,
+    coin_shimmer=0.0,
+):
+    open_amount = max(0.0, min(1.0, float(open_amount)))
+    lock_drop = max(0.0, min(1.0, float(lock_drop)))
     shake_x = int(random.uniform(-7, 7) * shake)
     shake_y = int(random.uniform(-5, 5) * shake)
     cx, cy = center[0] + shake_x, center[1] + shake_y
@@ -120,9 +161,24 @@ def draw_chest_fallback(surface, center, t, open_amount=0.0, shake=0.0):
         pygame.draw.rect(surface, GOLD, (base_rect.left + 14, yy, base_rect.width - 28, 22), border_radius=10)
         pygame.draw.rect(surface, GOLD_DARK, (base_rect.left + 14, yy, base_rect.width - 28, 22), width=4, border_radius=10)
 
+    if open_amount > 0.14 or show_coins:
+        cavity = pygame.Rect(base_rect.left + 26, base_rect.top + 8, base_rect.width - 52, 92)
+        pygame.draw.rect(surface, (78, 47, 22), cavity, border_radius=18)
+        pygame.draw.rect(surface, (115, 66, 28), cavity, width=3, border_radius=18)
+
+        rows = 4
+        cols = 9
+        for row in range(rows):
+            for col in range(cols):
+                jitter = math.sin((row * 0.6) + (col * 0.7) + coin_shimmer * 5.5 + t * 2.2)
+                coin_x = cavity.left + 40 + col * 54 + int(jitter * 2)
+                coin_y = cavity.bottom - 12 - row * 18 - int(abs(jitter) * 3)
+                coin_radius = 13 - row
+                draw_spanish_gold_coin(surface, (coin_x, coin_y), coin_radius, t + (row * 0.21), stamp_phase=col * 0.55)
+
     lid_h = 100
     lid_rect = pygame.Rect(cx - 270, cy - 110, 540, lid_h)
-    lid_drop = int(open_amount * 52)
+    lid_drop = int(open_amount * 84)
     lid_y = lid_rect.y - lid_drop
 
     pygame.draw.rect(surface, (150, 90, 44), (lid_rect.x, lid_y, lid_rect.w, lid_h), border_radius=24)
@@ -134,14 +190,25 @@ def draw_chest_fallback(surface, center, t, open_amount=0.0, shake=0.0):
     pygame.draw.rect(surface, GOLD, (lid_rect.x + 8, lid_y + 18, lid_rect.w - 16, 20), border_radius=10)
     pygame.draw.rect(surface, GOLD_DARK, (lid_rect.x + 8, lid_y + 18, lid_rect.w - 16, 20), width=4, border_radius=10)
 
-    lock_x = cx
-    lock_y = cy + 18
-    pygame.draw.rect(surface, (250, 223, 95), (lock_x - 30, lock_y, 60, 70), border_radius=12)
-    pygame.draw.rect(surface, GOLD_DARK, (lock_x - 30, lock_y, 60, 70), width=4, border_radius=12)
-    pygame.draw.circle(surface, (210, 160, 45), (lock_x, lock_y + 35), 11)
+    lock_surface = pygame.Surface((110, 120), pygame.SRCALPHA)
+    pygame.draw.rect(lock_surface, (250, 223, 95), (25, 28, 60, 70), border_radius=12)
+    pygame.draw.rect(lock_surface, GOLD_DARK, (25, 28, 60, 70), width=4, border_radius=12)
+    pygame.draw.circle(lock_surface, (210, 160, 45), (55, 63), 11)
+    pygame.draw.circle(lock_surface, WHITE, (72, 46), 3)
 
-    shimmer = int(8 + 4 * math.sin(t * 5.8))
-    pygame.draw.circle(surface, WHITE, (lock_x + 17, lock_y + 18), max(1, shimmer // 3))
+    if lock_unlocked:
+        drift_x = int(34 * lock_drop)
+        drift_y = int(88 * lock_drop)
+        spin = -30 * lock_drop
+        falling_lock = pygame.transform.rotozoom(lock_surface, spin, max(0.72, 1.0 - 0.28 * lock_drop))
+        lock_rect = falling_lock.get_rect(center=(cx + drift_x, cy + 52 + drift_y))
+        surface.blit(falling_lock, lock_rect)
+    else:
+        lock_rect = lock_surface.get_rect(center=(cx, cy + 52))
+        surface.blit(lock_surface, lock_rect)
+
+    shimmer = int(8 + 4 * math.sin(t * 5.8 + coin_shimmer * 1.7))
+    pygame.draw.circle(surface, WHITE, (cx + 17, cy + 36), max(1, shimmer // 3))
 
 
 def draw_parrot_fallback(surface, x, y, t, emotion="happy"):

@@ -10,7 +10,7 @@ import pygame
 from .constants import FPS, HEIGHT, TITLE, WIDTH
 from .difficulty import DifficultyManager
 from .managers import AudioManager, SaveManager, SpriteManager
-from .scenes import BuilderScene, CrackScene, LandingScene, LessonScene, ParentReportScene
+from .scenes import BuilderScene, CrackScene, LandingScene, LessonScene, ParentReportScene, VoyageIntroScene
 from .ui import FontBook
 
 
@@ -51,7 +51,7 @@ class PiratePasswordGame:
         self.mouse_inside_canvas = True
         self._apply_display_mode(self.fullscreen)
 
-        self.switch_scene("landing")
+        self.switch_scene("voyage_intro")
 
     def _apply_display_mode(self, fullscreen: bool):
         self.fullscreen = bool(fullscreen)
@@ -102,7 +102,9 @@ class PiratePasswordGame:
         return pygame.event.Event(event.type, event_dict)
 
     def switch_scene(self, name, payload=None):
-        if name == "landing":
+        if name == "voyage_intro":
+            self.current_scene = VoyageIntroScene(self)
+        elif name == "landing":
             self.current_scene = LandingScene(self)
         elif name == "crack":
             self.current_scene = CrackScene(self)

@@ -15,6 +15,7 @@ import pygame
 
 from .constants import (
     BLACK,
+    DIFFICULTY_ORDER,
     GREEN,
     MIXER_BUFFER,
     MIXER_CHANNELS,
@@ -59,8 +60,8 @@ class SaveManager:
                 "fullscreen": False,
             },
             "stats": {
-                "rounds_played": {"easy": 0, "medium": 0, "hard": 0},
-                "rounds_won": {"easy": 0, "medium": 0, "hard": 0},
+                "rounds_played": {diff: 0 for diff in DIFFICULTY_ORDER},
+                "rounds_won": {diff: 0 for diff in DIFFICULTY_ORDER},
                 "total_hints": 0,
                 "total_attempts": 0,
                 "best_builder_strength": 0,
@@ -115,7 +116,7 @@ class SaveManager:
         data["settings"]["sfx_volume"] = self._clamp01(float(settings.get("sfx_volume", data["settings"]["sfx_volume"])))
         data["settings"]["fullscreen"] = bool(settings.get("fullscreen", data["settings"]["fullscreen"]))
 
-        for diff in ("easy", "medium", "hard"):
+        for diff in DIFFICULTY_ORDER:
             data["stats"]["rounds_played"][diff] = int(stats.get("rounds_played", {}).get(diff, 0))
             data["stats"]["rounds_won"][diff] = int(stats.get("rounds_won", {}).get(diff, 0))
 
@@ -264,7 +265,7 @@ class SaveManager:
 
     def parent_summary(self):
         rounds = self.stats["round_results"]
-        by_diff = {"easy": [], "medium": [], "hard": []}
+        by_diff = {diff: [] for diff in DIFFICULTY_ORDER}
         solved_rounds = []
         hint_total = 0
 
@@ -344,6 +345,7 @@ class AudioManager:
         self.sfx["success"] = self._load_or_tone("assets/audio/sfx/success.wav", 900, 0.25)
         self.sfx["confetti"] = self._load_or_tone("assets/audio/sfx/confetti.wav", 760, 0.16)
         self.sfx["reward"] = self._load_or_tone("assets/audio/sfx/reward.wav", 990, 0.22)
+        self.sfx["coins_clink"] = self._load_or_custom("assets/audio/sfx/coins_clink.wav", self._coin_clink)
 
         music_path = self.root_dir / "assets/audio/music/island_loop.wav"
         if music_path.exists():
@@ -363,6 +365,15 @@ class AudioManager:
                 pass
         return self._tone(freq, dur)
 
+    def _load_or_custom(self, rel_path, generator):
+        path = self.root_dir / rel_path
+        if path.exists():
+            try:
+                return pygame.mixer.Sound(str(path))
+            except pygame.error:
+                pass
+        return generator()
+
     def _tone(self, freq, dur, amplitude=0.18):
         samples = int(MIXER_FREQUENCY * dur)
         buf = array("h")
@@ -370,6 +381,26 @@ class AudioManager:
             env = 1.0 - (i / max(1, samples))
             wave = math.sin(2 * math.pi * freq * i / MIXER_FREQUENCY)
             value = int(32767 * amplitude * env * wave)
+            buf.append(value)
+        return pygame.mixer.Sound(buffer=buf.tobytes())
+
+    def _coin_clink(self):
+        dur = 0.34
+        samples = int(MIXER_FREQUENCY * dur)
+        buf = array("h")
+        for i in range(samples):
+            t = i / MIXER_FREQUENCY
+            env = (1.0 - (i / max(1, samples))) ** 2.1
+            body = (
+                math.sin(2 * math.pi * 1320 * t)
+                + 0.68 * math.sin(2 * math.pi * 1870 * t + 0.9)
+                + 0.42 * math.sin(2 * math.pi * 2640 * t + 0.3)
+            )
+            transient = 0.0
+            if t < 0.03:
+                transient = math.sin(2 * math.pi * 3250 * t) * (1.0 - (t / 0.03))
+            value = int(32767 * 0.12 * (env * body + transient * 0.55))
+            value = max(-32767, min(32767, value))
             buf.append(value)
         return pygame.mixer.Sound(buffer=buf.tobytes())
 

@@ -52,4 +52,4 @@ PARENT_HOLD_SECONDS = 2.0
 PARENT_HOTSPOT = (792, 0, 108, 108)
 
 # Difficulty labels
-DIFFICULTY_ORDER = ["easy", "medium", "hard"]
+DIFFICULTY_ORDER = ["easy", "medium", "hard", "expert"]
