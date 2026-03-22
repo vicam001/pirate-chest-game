@@ -99,10 +99,10 @@ class DifficultyManager:
         cfg = self.get_config(difficulty)
         space = self.code_space(difficulty)
         return [
-            f"You cracked a {cfg.length}-digit lock.",
-            f"Code space size: {space:,} possible combinations.",
-            "Longer locks are stronger than short ones.",
-            "Each extra digit makes guessing harder.",
-            "Avoid simple patterns like 1111 or 1234.",
-            "Use long, mixed passwords for real accounts.",
+            f"You cracked a {cfg.length}-digit lock — brilliant work, Captain!",
+            f"That lock had {space:,} possible combinations to guess.",
+            "Longer passwords with LETTERS + NUMBERS + SYMBOLS are strongest.",
+            "Never share your password — not even with best friends!",
+            "Keep personal info private: name, address, birthday, school.",
+            "Mix letters, numbers and symbols for pirate-proof protection!",
         ]

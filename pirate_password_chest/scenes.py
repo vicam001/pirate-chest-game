@@ -97,36 +97,36 @@ class VoyageIntroScene(BaseScene):
         self.skip_button = Button((736, 10, 148, 48), "SKIP", (110, 76, 45), (130, 94, 58), pulse=False)
         self.choice_a_button = Button((118, 458, 300, 78), "CHOICE A", (82, 112, 82), (102, 131, 98), pulse=False)
         self.choice_b_button = Button((482, 458, 300, 78), "CHOICE B", (147, 88, 66), (170, 106, 80), pulse=False)
-        self.disembark_button = Button((240, 520, 420, 64), "DISEMBARK!", (176, 124, 60), (198, 145, 78))
+        self.disembark_button = Button((240, 540, 420, 64), "DISEMBARK!", (176, 124, 60), (198, 145, 78))
 
         self.questions = [
             {
                 "trigger": 0.22,
-                "question": "Captain asks: Which secret clue is tougher for sneaky pirates to guess?",
-                "choices": ("MIX + SYMBOL", "PET NAME"),
+                "question": "A stranger online asks for your full name and home address. What do you do?",
+                "choices": ("KEEP SECRET!", "TELL THEM"),
                 "responses": (
-                    "Aye! Mixing words and symbols keeps treasure safer.",
-                    "Too easy to guess. We toughen the code before docking.",
+                    "Brilliant! Never share your address with strangers online!",
+                    "Oh no! Your home address is secret treasure — never share it!",
                 ),
                 "best": 0,
             },
             {
                 "trigger": 0.50,
-                "question": "Shark scout asks: A stranger wants your password. What now?",
-                "choices": ("KEEP IT SECRET", "SHARE IT"),
+                "question": "Which password is harder for sneaky pirates to crack?",
+                "choices": ("Sun$et#42!", "fluffy"),
                 "responses": (
-                    "Right call. Passwords stay with trusted grown-ups only.",
-                    "Nope! Even friendly strangers do not get your password.",
+                    "Aye! Mixing letters, numbers and symbols makes super-strong passwords!",
+                    "Too easy to guess! Always mix letters, numbers AND symbols!",
                 ),
                 "best": 0,
             },
             {
                 "trigger": 0.78,
-                "question": "Reef gate asks: Which lock is strongest for your chest?",
-                "choices": ("LONG + MIXED", "4 DIGITS"),
+                "question": "Your friend wants your password so they can help you. What do you do?",
+                "choices": ("KEEP SECRET!", "TELL THEM"),
                 "responses": (
-                    "Perfect. Long and mixed is hard to crack.",
-                    "Short codes sink fast. We upgrade to a longer lock.",
+                    "Well done! Only share passwords with trusted grown-ups like parents!",
+                    "Watch out! Even good friends should not get your password!",
                 ),
                 "best": 0,
             },
@@ -158,7 +158,7 @@ class VoyageIntroScene(BaseScene):
         self.question_cursor = 0
         self.awaiting_choice = False
         self.active_question = None
-        self.status_line = "Captain's Log: Set sail for Password Island!"
+        self.status_line = "Captain's Log: Set sail for Password Island! Learn to keep your treasure safe!"
         self.response_timer = 0.0
         self.disembark_ready = False
         self.auto_land_timer = 0.0
@@ -485,7 +485,7 @@ class VoyageIntroScene(BaseScene):
 
         if self.progress >= 1.0:
             self.disembark_ready = True
-            self.status_line = "Land ho! Crew disembarks on Password Island."
+            self.status_line = "Land ho! You've learned to guard your personal treasure. Well done, Captain!"
             self.game.audio.play_sfx("reward")
 
     def draw(self, screen):
@@ -505,7 +505,7 @@ class VoyageIntroScene(BaseScene):
         draw_panel(screen, title_panel, bg_color=(78, 52, 32), border_color=(184, 143, 88))
         draw_text_outline(screen, "Charted Voyage To Password Island", self.game.fonts.med, (245, 213, 133), BLACK, (450, 39), center=True)
 
-        status_panel = pygame.Rect(96, 78, 708, 74)
+        status_panel = pygame.Rect(96, 84, 708, 70)
         draw_panel(screen, status_panel, bg_color=(86, 64, 46), border_color=(198, 159, 103))
         for idx, line in enumerate(wrap_text(self.status_line, self.game.fonts.tiny, status_panel.width - 34)[:2]):
             draw_text_outline(
@@ -691,7 +691,7 @@ class LandingScene(BaseScene):
         draw_text_outline(screen, "Pirate Password Chest", self.game.fonts.huge, YELLOW, BLACK, (450, 208), center=True)
         draw_text_outline(screen, "Arrr You Safe?", self.game.fonts.med, WHITE, BLACK, (450, 296), center=True)
 
-        self.draw_speech_bubble("Ahoy! Protect your treasure with strong passwords, matey!", tail_x=628, tail_y=168)
+        self.draw_speech_bubble("Ahoy! Protect your info online — and never share your password!", tail_x=628, tail_y=168)
 
         self.play_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.diff_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
@@ -751,14 +751,16 @@ class CrackScene(BaseScene):
         self.virgil_quote_timer = 0.0
         self.virgil_next_quote_delay = random.uniform(5.0, 9.0)
         self.virgil_idle_quotes = [
-            "Arrr! I hide me socks where no pirate can find 'em!",
-            "Shiver me crayons, that chest looks giggly today!",
-            "Yo-ho-ho! Even me rubber duck says use a strong code!",
-            "Blimey biscuits! I once got locked out by me own parrot puzzle!",
-            "Ahoy, matey! Pirate rule #1: never use '1234' for treasure!",
-            "Squawk! My pirate hat is full of jellybeans and secrets!",
-            "Yarr! Strong passwords make sneaky sharks cry!",
-            "Heave-ho! Captain Virgil approves extra symbols!",
+            "Arrr! Never share your home address with strangers online!",
+            "Yo-ho-ho! Your birthday is secret treasure — keep it private!",
+            "Blimey! A strong password mixes LETTERS, NUMBERS and SYMBOLS!",
+            "Ahoy! Never use your pet's name as a password — pirates guess that!",
+            "Squawk! Only share your password with a trusted grown-up like a parent!",
+            "Yarr! Strong passwords make sneaky sharks cry salty tears!",
+            "Heave-ho! Captain Virgil says: never click links from strangers!",
+            "Shiver me timbers! Your school name is private pirate info!",
+            "Arrr! A password like 'MyD0g$Fido' is WAY stronger than 'fido'!",
+            "Blimey biscuits! Never tell ANYONE your password — it's your secret treasure!",
         ]
         self.last_virgil_quote = ""
 
@@ -1143,7 +1145,8 @@ class CrackScene(BaseScene):
         self.draw_speech_bubble(self.parrot_line, tail_x=self.virgil_pos[0] - 16, tail_y=virgil_y + 36)
 
         title = "Chest Unlocked! Treasure Reveal" if self.win else f"Crack the {self.config.length}-char code!"
-        draw_text_outline(screen, title, self.game.fonts.big, YELLOW, BLACK, (450, 198), center=True)
+        title_color = YELLOW if self.win else ORANGE
+        draw_text_outline(screen, title, self.game.fonts.big, title_color, BLACK, (450, 198), center=True)
         diff_line = "Legendary Reward Sequence" if self.win else f"Difficulty: {self.config.label}"
         draw_text_outline(screen, diff_line, self.game.fonts.small, CYAN, BLACK, (450, 274), center=True)
 
@@ -1194,8 +1197,8 @@ class CrackScene(BaseScene):
 class LessonScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self.to_builder_button = Button((205, 496, 490, 78), "BUILD STRONG PASSWORD", (84, 190, 96), (110, 214, 122), pulse=False)
-        self.play_again_button = Button((305, 550, 290, 45), "PLAY AGAIN", (255, 172, 50), (255, 196, 80), pulse=False)
+        self.to_builder_button = Button((80, 492, 380, 74), "BUILD STRONG PASSWORD", (84, 190, 96), (110, 214, 122), pulse=False)
+        self.play_again_button = Button((470, 492, 340, 74), "PLAY AGAIN", (255, 172, 50), (255, 196, 80), pulse=False)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -1227,16 +1230,21 @@ class LessonScene(BaseScene):
         draw_text_outline(screen, summary, self.game.fonts.small, BLUE, BLACK, (450, 160), center=True)
 
         lines = self.game.difficulty_manager.lesson_lines(self.game.current_difficulty)
-        y = 210
+        y = 202
         for line in lines:
             draw_text_outline(screen, line, self.game.fonts.small, BLACK, YELLOW, (450, y), center=True)
-            y += 52
+            y += 44
 
-        example = "Example: MyPirateIsland$42!"
-        draw_text_outline(screen, example, self.game.fonts.small, DARK_BLUE, BLACK, (450, 430), center=True)
+        example = "Strong example: C@pt@in$tar42!"
+        draw_text_outline(screen, example, self.game.fonts.small, DARK_BLUE, BLACK, (450, 462), center=True)
 
         self.to_builder_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.play_again_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+
+        tip_panel = pygame.Rect(70, 572, 760, 22)
+        pygame.draw.rect(screen, (255, 248, 215), tip_panel, border_radius=6)
+        pygame.draw.rect(screen, (180, 140, 50), tip_panel, width=2, border_radius=6)
+        draw_text_outline(screen, "Remember: Never share passwords or personal info with strangers!", self.game.fonts.tiny, BLACK, YELLOW, (450, 583), center=True)
 
 
 class BuilderScene(BaseScene):
@@ -1262,7 +1270,7 @@ class BuilderScene(BaseScene):
     def enter(self, payload=None):
         self.password = ""
         self.strength = 0
-        self.parrot_line = "Build a mighty password with letters, numbers, and symbols!"
+        self.parrot_line = "Mix letters, numbers and symbols for a treasure-proof password!"
         self.parrot_emotion = "talk"
         self.confetti.clear()
         self.sparkles.clear()
@@ -1411,36 +1419,50 @@ class BuilderScene(BaseScene):
             t,
             fallback=lambda s: draw_chest_fallback(s, (450, 340), t, open_amount=1.0, shake=0.0),
         )
+
+        # Parrot at far right with custom side speech bubble
         emotion = "cheer" if self.parrot_emotion == "cheer" else "talk"
         self.game.sprite_manager.draw_parrot(
             screen,
-            (575, 175),
+            (790, 150),
             emotion,
             t,
-            fallback=lambda s: draw_parrot_fallback(s, 575, 175, t, emotion="cheer" if emotion == "cheer" else "happy"),
+            fallback=lambda s: draw_parrot_fallback(s, 790, 150, t, emotion="cheer" if emotion == "cheer" else "happy"),
         )
+        bubble = pygame.Rect(470, 14, 400, 110)
+        pygame.draw.rect(screen, WHITE, bubble, border_radius=22)
+        pygame.draw.rect(screen, BLACK, bubble, width=4, border_radius=22)
+        tail = [(770, 124), (790, 150), (805, 124)]
+        pygame.draw.polygon(screen, WHITE, tail)
+        pygame.draw.polygon(screen, BLACK, tail, width=4)
+        bubble_lines = wrap_text(self.parrot_line, self.game.fonts.tiny, bubble.width - 24)
+        yy = bubble.top + 20
+        for line in bubble_lines[:3]:
+            draw_text_outline(screen, line, self.game.fonts.tiny, BLACK, YELLOW, (bubble.centerx, yy), center=True)
+            yy += 32
 
-        self.draw_speech_bubble(self.parrot_line, tail_x=560, tail_y=168)
-
-        draw_text_outline(screen, "Build Your Own Strong Password!", self.game.fonts.big, YELLOW, BLACK, (450, 190), center=True)
-
-        box = pygame.Rect(80, 120, 740, 82)
+        # Password display box (y=182, no overlap with bubble at y=14-124)
+        box = pygame.Rect(80, 182, 740, 68)
         pygame.draw.rect(screen, WHITE, box, border_radius=18)
         pygame.draw.rect(screen, BLACK, box, width=5, border_radius=18)
+
+        # Title drawn after box so it sits on top
+        draw_text_outline(screen, "Build Your Own Strong Password!", self.game.fonts.small, YELLOW, BLACK, (450, 174), center=True)
 
         shown = self.password if self.password else "(click buttons below)"
         if len(shown) > 30:
             shown = shown[:27] + "..."
         draw_text_outline(screen, shown, self.game.fonts.med, BLUE, BLACK, box.center, center=True)
 
-        x, y, w, h = 130, 235, 640, 62
+        # Strength bar at y=260, h=52
+        x, y, w, h = 130, 260, 640, 52
         pygame.draw.rect(screen, (217, 233, 220), (x - 6, y - 6, w + 12, h + 12), border_radius=16)
         pygame.draw.rect(screen, BLACK, (x - 6, y - 6, w + 12, h + 12), width=4, border_radius=16)
         pygame.draw.rect(screen, (80, 105, 86), (x, y, w, h), border_radius=14)
         fill = int(w * (self.strength / 100))
         if fill > 0:
             pygame.draw.rect(screen, GREEN, (x, y, fill, h), border_radius=14)
-        draw_text_outline(screen, f"Strength: {self.strength}%", self.game.fonts.med, YELLOW, BLACK, (450, y + h // 2), center=True)
+        draw_text_outline(screen, f"Strength: {self.strength}%", self.game.fonts.small, YELLOW, BLACK, (450, y + h // 2), center=True)
 
         self.add_letter_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.add_number_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
@@ -1450,7 +1472,12 @@ class BuilderScene(BaseScene):
         self.finish_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
         if self.strength >= 100:
-            draw_text_outline(screen, "TREASURE-SAFE PASSWORD!", self.game.fonts.med, GREEN, BLACK, (450, 520), center=True)
+            draw_text_outline(screen, "TREASURE-SAFE PASSWORD!", self.game.fonts.med, GREEN, BLACK, (450, 515), center=True)
+        else:
+            tip_panel = pygame.Rect(130, 504, 640, 26)
+            pygame.draw.rect(screen, (255, 252, 220), tip_panel, border_radius=8)
+            pygame.draw.rect(screen, (200, 160, 50), tip_panel, width=2, border_radius=8)
+            draw_text_outline(screen, "Tip: Don't use your real name or birthday in your password!", self.game.fonts.tiny, (80, 50, 10), YELLOW, (450, 517), center=True)
 
         self.draw_particles(self.sparkles)
         self.draw_particles(self.confetti)
