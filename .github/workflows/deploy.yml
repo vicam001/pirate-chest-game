@@ -26,25 +26,30 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: 'pip'   # optional: speeds up, but we want fresh pygbag
 
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Convert WAV audio to OGG
+      - name: Convert WAV to OGG (if any)
         run: |
-          find assets/audio -name '*.wav' -print0 | while IFS= read -r -d '' f; do
-            ffmpeg -y -i "$f" "${f%.wav}.ogg" && rm "$f"
-          done
+          find assets/audio -name '*.wav' -print0 2>/dev/null | while IFS= read -r -d '' f; do
+            ffmpeg -y -i "$$   f" "   $${f%.wav}.ogg" && rm "$f"
+          done || true   # continue even if no files
 
-      - name: Update audio references to OGG
+      - name: Update audio references to .ogg
         run: |
-          find . -name '*.py' -not -path './build/*' -print0 | xargs -0 sed -i 's/\.wav/.ogg/g'
+          find . -name '*.py' -not -path './build/*' -print0 | xargs -0 sed -i 's/\.wav/.ogg/g' || true
 
-      - name: Install pygbag
-        run: pip install pygbag --upgrade
+      - name: Install latest pygbag
+        run: |
+          pip install --upgrade pip
+          pip install pygbag --upgrade --no-cache-dir   # --no-cache-dir forces fresh download
 
-      - name: Show pygbag version
-        run: pip show pygbag
+      - name: Show pygbag & python versions
+        run: |
+          python --version
+          pip show pygbag
 
       - name: Clean old build artifacts
         run: rm -rf build/ __pycache__/
@@ -52,13 +57,14 @@ jobs:
       - name: Build with pygbag
         run: python -m pygbag --build .
 
-      - name: List build output
-        run: ls -la build/web/
+      - name: List build/web contents (debug)
+        run: ls -laR build/web/ || true
 
       - name: Add .nojekyll
         run: touch build/web/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
 
