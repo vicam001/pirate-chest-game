@@ -1241,10 +1241,10 @@ class LessonScene(BaseScene):
         self.to_builder_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.play_again_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
-        tip_panel = pygame.Rect(70, 572, 760, 22)
+        tip_panel = pygame.Rect(70, 570, 760, 28)
         pygame.draw.rect(screen, (255, 248, 215), tip_panel, border_radius=6)
         pygame.draw.rect(screen, (180, 140, 50), tip_panel, width=2, border_radius=6)
-        draw_text_outline(screen, "Remember: Never share passwords or personal info with strangers!", self.game.fonts.tiny, BLACK, YELLOW, (450, 583), center=True)
+        draw_text_outline(screen, "Remember: Never share passwords or personal info with strangers!", self.game.fonts.tiny, BLACK, YELLOW, (tip_panel.centerx, tip_panel.centery), center=True)
 
 
 class BuilderScene(BaseScene):
@@ -1352,11 +1352,16 @@ class BuilderScene(BaseScene):
             self.parrot_emotion = "cheer"
             self.game.audio.play_sfx("click")
         elif self.strength >= 50:
-            self.parrot_line = "Nice! Add symbols for extra strength."
+            self.parrot_line = "Nice! Add symbols for extra strength — and never use your real name!"
             self.parrot_emotion = "talk"
             self.game.audio.play_sfx("click")
         else:
-            self.parrot_line = "Good start! Keep building."
+            tips = [
+                "Good start! Don't use your real name or birthday!",
+                "Keep building — mix letters AND numbers AND symbols!",
+                "Longer passwords protect your treasure even better!",
+            ]
+            self.parrot_line = random.choice(tips)
             self.parrot_emotion = "talk"
             self.game.audio.play_sfx("click")
 
@@ -1462,7 +1467,11 @@ class BuilderScene(BaseScene):
         fill = int(w * (self.strength / 100))
         if fill > 0:
             pygame.draw.rect(screen, GREEN, (x, y, fill, h), border_radius=14)
-        draw_text_outline(screen, f"Strength: {self.strength}%", self.game.fonts.small, YELLOW, BLACK, (450, y + h // 2), center=True)
+        # Strength label lives inside the bar — consistent small font, no extra text below buttons
+        if self.strength >= 100:
+            draw_text_outline(screen, "TREASURE-SAFE!  ★ 100%", self.game.fonts.small, GREEN, BLACK, (450, y + h // 2), center=True)
+        else:
+            draw_text_outline(screen, f"Strength: {self.strength}%", self.game.fonts.small, YELLOW, BLACK, (450, y + h // 2), center=True)
 
         self.add_letter_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.add_number_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
@@ -1470,14 +1479,6 @@ class BuilderScene(BaseScene):
         self.backspace_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.clear_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.finish_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
-
-        if self.strength >= 100:
-            draw_text_outline(screen, "TREASURE-SAFE PASSWORD!", self.game.fonts.med, GREEN, BLACK, (450, 515), center=True)
-        else:
-            tip_panel = pygame.Rect(130, 504, 640, 26)
-            pygame.draw.rect(screen, (255, 252, 220), tip_panel, border_radius=8)
-            pygame.draw.rect(screen, (200, 160, 50), tip_panel, width=2, border_radius=8)
-            draw_text_outline(screen, "Tip: Don't use your real name or birthday in your password!", self.game.fonts.tiny, (80, 50, 10), YELLOW, (450, 517), center=True)
 
         self.draw_particles(self.sparkles)
         self.draw_particles(self.confetti)
