@@ -33,13 +33,14 @@ class PiratePasswordGame:
         self.root_dir = Path(root_dir)
         self.presentation_mode = presentation
 
-        pygame.init()
+        if not pygame.get_init():
+            pygame.init()
         pygame.display.set_caption(TITLE)
         self.clock = pygame.time.Clock()
 
         # Virtual game canvas remains fixed; display can be fullscreen with letterboxing.
         self.screen = pygame.Surface((WIDTH, HEIGHT))
-        self.display_surface = None
+        self.display_surface = pygame.display.get_surface() or pygame.display.set_mode((WIDTH, HEIGHT))
         self.render_rect = pygame.Rect(0, 0, WIDTH, HEIGHT)
         self._scaled_surface = None
         self._scaled_surface_size = None
@@ -101,7 +102,7 @@ class PiratePasswordGame:
     def _apply_display_mode(self, fullscreen: bool):
         self.fullscreen = bool(fullscreen)
         if sys.platform == "emscripten":
-            self.display_surface = pygame.display.set_mode((WIDTH, HEIGHT))
+            self.display_surface = pygame.display.get_surface()
         elif self.fullscreen:
             flags = pygame.DOUBLEBUF | pygame.FULLSCREEN
             self.display_surface = pygame.display.set_mode((0, 0), flags)
@@ -223,6 +224,7 @@ class PiratePasswordGame:
         save_accum = 0.0
         while self.running:
             dt = self.clock.tick(FPS) / 1000.0
+            await asyncio.sleep(0)
             self.wave_phase += dt * 2.2
             self.save_manager.add_session_time(dt)
             save_accum += dt
@@ -300,8 +302,6 @@ class PiratePasswordGame:
             if save_accum >= 1.0:
                 self.save_manager.save()
                 save_accum = 0.0
-
-            await asyncio.sleep(0)
 
         self.save_manager.save()
         pygame.quit()
