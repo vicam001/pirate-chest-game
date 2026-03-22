@@ -93,6 +93,14 @@ def draw_background(surface, width, height, t, wave_phase):
     pygame.draw.circle(surface, (255, 237, 105), (98, 92), 52)
     pygame.draw.circle(surface, (255, 250, 173), (98, 92), 30)
 
+    # Stars in the sky
+    for i, (sx, sy) in enumerate([(50, 42), (160, 28), (310, 14), (510, 20), (680, 35), (820, 22), (870, 55)]):
+        star_pulse = abs(math.sin(t * 1.8 + i * 0.7)) * 0.6 + 0.4
+        star_radius = int(3 * star_pulse)
+        if star_radius > 0:
+            pygame.draw.circle(surface, (255, 255, 240), (sx, sy), star_radius)
+            pygame.draw.circle(surface, (255, 255, 200), (sx, sy), max(1, star_radius - 1))
+
     ship_x = 700 + int(math.sin(t * 0.8) * 12)
     ship_y = 255 + int(math.sin(t * 1.6) * 3)
     pygame.draw.polygon(surface, (90, 55, 30), [(ship_x, ship_y), (ship_x + 84, ship_y), (ship_x + 60, ship_y + 18), (ship_x + 18, ship_y + 18)])
