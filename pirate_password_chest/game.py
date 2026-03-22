@@ -100,12 +100,13 @@ class PiratePasswordGame:
 
     def _apply_display_mode(self, fullscreen: bool):
         self.fullscreen = bool(fullscreen)
-        flags = pygame.DOUBLEBUF
-        if self.fullscreen:
-            flags |= pygame.FULLSCREEN
+        if sys.platform == "emscripten":
+            self.display_surface = pygame.display.set_mode((WIDTH, HEIGHT))
+        elif self.fullscreen:
+            flags = pygame.DOUBLEBUF | pygame.FULLSCREEN
             self.display_surface = pygame.display.set_mode((0, 0), flags)
         else:
-            self.display_surface = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+            self.display_surface = pygame.display.set_mode((WIDTH, HEIGHT), pygame.DOUBLEBUF)
 
         self._recompute_render_rect()
 

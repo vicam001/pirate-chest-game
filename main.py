@@ -21,8 +21,13 @@ async def main():
         args = parser.parse_args()
         presentation = args.presentation
 
+    if sys.platform == "emscripten":
+        root_dir = Path(".")
+    else:
+        root_dir = Path(__file__).resolve().parent
+
     game = PiratePasswordGame(
-        root_dir=Path(__file__).resolve().parent,
+        root_dir=root_dir,
         presentation=presentation,
     )
     await game.run()
