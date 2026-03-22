@@ -199,6 +199,39 @@ FINALE_DIALOGUE = DialogueSequence([
 
 
 # ---------------------------------------------------------------------------
+# Treasure vault lesson items
+# ---------------------------------------------------------------------------
+
+TREASURE_ITEMS = [
+    {
+        "name": "Golden Key",
+        "lesson": "A unique password is like a key that can't be copied!",
+        "draw_func": "draw_golden_key",
+    },
+    {
+        "name": "Ruby Shield",
+        "lesson": "Symbols (!@#$) are your shield against pirates!",
+        "draw_func": "draw_ruby_shield",
+    },
+    {
+        "name": "Emerald Scroll",
+        "lesson": "Longer passwords = stronger magic spells!",
+        "draw_func": "draw_emerald_scroll",
+    },
+    {
+        "name": "Diamond Crown",
+        "lesson": "Mix LETTERS + NUMBERS + SYMBOLS for royal strength!",
+        "draw_func": "draw_diamond_crown",
+    },
+    {
+        "name": "Captain's Medal",
+        "lesson": "Keep your password secret -- never share your treasure map!",
+        "draw_func": "draw_captains_medal",
+    },
+]
+
+
+# ---------------------------------------------------------------------------
 # DialogueManager -- sequential dialogue playback
 # ---------------------------------------------------------------------------
 

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
 import pygame
 
 from .constants import FPS, HEIGHT, TITLE, WIDTH
-from .dialogue import DialogueManager
+from .dialogue import CHARACTERS, DialogueManager
 from .difficulty import DifficultyManager
 from .managers import AudioManager, SaveManager, SpriteManager
 from .presentation import PresentationController
@@ -21,7 +22,8 @@ from .scenes import (
     ParentReportScene,
     VoyageIntroScene,
 )
-from .ui import FontBook
+from .ui import FontBook, draw_dialogue_panel, draw_text_outline
+from .virgil import Virgil
 
 
 class PiratePasswordGame:
@@ -37,6 +39,9 @@ class PiratePasswordGame:
         self.screen = pygame.Surface((WIDTH, HEIGHT))
         self.display_surface = None
         self.render_rect = pygame.Rect(0, 0, WIDTH, HEIGHT)
+        self._scaled_surface = None
+        self._scaled_surface_size = None
+        self._overlay_cache: dict[tuple[tuple[int, int, int], int], pygame.Surface] = {}
 
         self.fonts = FontBook()
 
@@ -50,6 +55,9 @@ class PiratePasswordGame:
         self.difficulty_manager = DifficultyManager()
 
         self.dialogue_manager = DialogueManager()
+
+        # Virgil — the star character, shared across all scenes
+        self.virgil = Virgil(x=700, y=350)
 
         self.current_difficulty = "easy"
         self.last_round_result = None
@@ -100,6 +108,9 @@ class PiratePasswordGame:
         rw = max(1, int(WIDTH * scale))
         rh = max(1, int(HEIGHT * scale))
         self.render_rect = pygame.Rect((dw - rw) // 2, (dh - rh) // 2, rw, rh)
+        if self._scaled_surface_size != self.render_rect.size:
+            self._scaled_surface = None
+            self._scaled_surface_size = None
 
     def toggle_fullscreen(self):
         self._apply_display_mode(not self.fullscreen)
@@ -183,8 +194,20 @@ class PiratePasswordGame:
         if self.render_rect.size == (WIDTH, HEIGHT):
             self.display_surface.blit(self.screen, self.render_rect.topleft)
         else:
-            scaled = pygame.transform.smoothscale(self.screen, self.render_rect.size)
-            self.display_surface.blit(scaled, self.render_rect.topleft)
+            self._scaled_surface = pygame.transform.smoothscale(self.screen, self.render_rect.size)
+            self.display_surface.blit(self._scaled_surface, self.render_rect.topleft)
+
+    def _get_overlay_surface(self, color, alpha):
+        key = (tuple(color), int(alpha))
+        overlay = self._overlay_cache.get(key)
+        if overlay is None:
+            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            overlay.fill((*color, int(alpha)))
+            self._overlay_cache[key] = overlay
+            if len(self._overlay_cache) > 32:
+                self._overlay_cache.clear()
+                self._overlay_cache[key] = overlay
+        return overlay
 
     def run(self):
         save_accum = 0.0
@@ -231,6 +254,9 @@ class PiratePasswordGame:
 
             # Update dialogue manager
             self.dialogue_manager.update(dt)
+
+            # Update Virgil animation
+            self.virgil.update(dt)
 
             self.current_scene.update(dt)
 
@@ -287,20 +313,13 @@ class PiratePasswordGame:
                 self._fade_direction = 0
 
         if self._fade_alpha > 0:
-            fade_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-            fade_surf.fill((0, 0, 0, self._fade_alpha))
-            self.screen.blit(fade_surf, (0, 0))
+            self.screen.blit(self._get_overlay_surface((0, 0, 0), self._fade_alpha), (0, 0))
 
     def _draw_dialogue_overlay(self):
         """Draw the current dialogue line as a large panel overlay."""
-        from .ui import draw_dialogue_panel, draw_text_outline
-        from .dialogue import CHARACTERS
-
         line = self.dialogue_manager.current_line()
         if line is None:
             return
-
-        import math
 
         char_info = CHARACTERS.get(line.character, {})
         char_name = char_info.get("name", line.character.title())
@@ -308,9 +327,7 @@ class PiratePasswordGame:
         portrait = self.sprite_manager.get_portrait(line.character)
 
         # Semi-transparent overlay behind dialogue
-        shade = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 100))
-        self.screen.blit(shade, (0, 0))
+        self.screen.blit(self._get_overlay_surface((0, 0, 0), 100), (0, 0))
 
         # Determine panel color tint based on character
         panel_bg = (

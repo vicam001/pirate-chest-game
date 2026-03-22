@@ -70,15 +70,24 @@ def draw_palm(surface, x, y, scale=1.0, sway=0.0):
         pygame.draw.line(surface, (45, 180, 80), top, end, int(16 * scale))
 
 
+_sky_gradient_cache: pygame.Surface | None = None
+_sky_gradient_size: tuple[int, int] = (0, 0)
+
+
 def draw_background(surface, width, height, t, wave_phase):
-    for y in range(0, 250):
-        p = y / 250
-        color = (
-            int(SKY_TOP[0] * (1 - p) + SKY_BOTTOM[0] * p),
-            int(SKY_TOP[1] * (1 - p) + SKY_BOTTOM[1] * p),
-            int(SKY_TOP[2] * (1 - p) + SKY_BOTTOM[2] * p),
-        )
-        pygame.draw.line(surface, color, (0, y), (width, y))
+    global _sky_gradient_cache, _sky_gradient_size
+    if _sky_gradient_cache is None or _sky_gradient_size != (width, 250):
+        _sky_gradient_cache = pygame.Surface((width, 250))
+        for y in range(0, 250):
+            p = y / 250
+            color = (
+                int(SKY_TOP[0] * (1 - p) + SKY_BOTTOM[0] * p),
+                int(SKY_TOP[1] * (1 - p) + SKY_BOTTOM[1] * p),
+                int(SKY_TOP[2] * (1 - p) + SKY_BOTTOM[2] * p),
+            )
+            pygame.draw.line(_sky_gradient_cache, color, (0, y), (width, y))
+        _sky_gradient_size = (width, 250)
+    surface.blit(_sky_gradient_cache, (0, 0))
 
     pygame.draw.rect(surface, OCEAN, (0, 250, width, 180))
     for i in range(0, width, 40):
@@ -435,3 +444,143 @@ def draw_parrot_fallback(surface, x, y, t, emotion="happy"):
 
     # ── Body outline for definition ──
     pygame.draw.ellipse(surface, body_dark, body_rect, width=2)
+
+
+# ---------------------------------------------------------------------------
+# Treasure item drawing functions (for the treasure vault reveal)
+# ---------------------------------------------------------------------------
+
+def draw_golden_key(surface, center, size, t):
+    """Draw a shimmering golden key."""
+    cx, cy = int(center[0]), int(center[1])
+    s = max(8, int(size))
+    # Key head (oval)
+    head_r = s // 2
+    pygame.draw.circle(surface, (250, 205, 55), (cx, cy - s // 4), head_r)
+    pygame.draw.circle(surface, (203, 151, 25), (cx, cy - s // 4), head_r, width=2)
+    # Key hole
+    pygame.draw.circle(surface, (170, 120, 30), (cx, cy - s // 4), head_r // 3)
+    # Shaft
+    shaft_w = max(3, s // 6)
+    pygame.draw.rect(surface, (250, 205, 55), (cx - shaft_w // 2, cy, shaft_w, s // 2))
+    pygame.draw.rect(surface, (203, 151, 25), (cx - shaft_w // 2, cy, shaft_w, s // 2), width=1)
+    # Teeth
+    for i in range(2):
+        ty = cy + s // 2 - i * (s // 5)
+        pygame.draw.rect(surface, (250, 205, 55), (cx + shaft_w // 2, ty - 2, s // 5, 4))
+        pygame.draw.rect(surface, (203, 151, 25), (cx + shaft_w // 2, ty - 2, s // 5, 4), width=1)
+    # Shimmer
+    glint_angle = t * 3.2
+    gx = cx + int(math.cos(glint_angle) * head_r * 0.4)
+    gy = cy - s // 4 - int(abs(math.sin(glint_angle)) * head_r * 0.3)
+    pygame.draw.circle(surface, (255, 255, 220), (gx, gy), max(2, s // 8))
+
+
+def draw_ruby_shield(surface, center, size, t):
+    """Draw a red gem set in a shield shape."""
+    cx, cy = int(center[0]), int(center[1])
+    s = max(8, int(size))
+    hs = s // 2
+    # Shield shape
+    pts = [(cx, cy - hs), (cx + hs, cy - hs // 3), (cx + hs * 2 // 3, cy + hs),
+           (cx, cy + hs + hs // 3), (cx - hs * 2 // 3, cy + hs), (cx - hs, cy - hs // 3)]
+    pygame.draw.polygon(surface, (200, 40, 40), pts)
+    pygame.draw.polygon(surface, (160, 30, 30), pts, width=2)
+    # Inner gem
+    gem_r = max(3, s // 4)
+    pygame.draw.circle(surface, (240, 80, 80), (cx, cy), gem_r)
+    pygame.draw.circle(surface, (255, 140, 140), (cx - gem_r // 3, cy - gem_r // 3), gem_r // 2)
+    pygame.draw.circle(surface, (160, 30, 30), (cx, cy), gem_r, width=1)
+    # Pulse
+    pulse = 1.0 + 0.08 * math.sin(t * 3)
+    if pulse > 1.04:
+        pygame.draw.circle(surface, (255, 200, 200), (cx, cy), int(gem_r * 1.3), width=1)
+
+
+def draw_emerald_scroll(surface, center, size, t):
+    """Draw a green rolled parchment scroll."""
+    cx, cy = int(center[0]), int(center[1])
+    s = max(8, int(size))
+    w = int(s * 0.8)
+    h = int(s * 1.2)
+    # Scroll body
+    pygame.draw.rect(surface, (60, 180, 80), (cx - w // 2, cy - h // 2, w, h), border_radius=4)
+    pygame.draw.rect(surface, (40, 140, 60), (cx - w // 2, cy - h // 2, w, h), width=2, border_radius=4)
+    # Rolled edges
+    roll_r = max(3, w // 5)
+    pygame.draw.circle(surface, (50, 160, 70), (cx - w // 2 + 2, cy - h // 2), roll_r)
+    pygame.draw.circle(surface, (40, 140, 60), (cx - w // 2 + 2, cy - h // 2), roll_r, width=1)
+    pygame.draw.circle(surface, (50, 160, 70), (cx - w // 2 + 2, cy + h // 2), roll_r)
+    pygame.draw.circle(surface, (40, 140, 60), (cx - w // 2 + 2, cy + h // 2), roll_r, width=1)
+    # Text lines
+    for i in range(3):
+        lx = cx - w // 3
+        ly = cy - h // 4 + i * (h // 4)
+        lw = w * 2 // 3 - (i % 2) * (w // 6)
+        pygame.draw.line(surface, (180, 255, 200), (lx, ly), (lx + lw, ly), 1)
+    # Sparkle dots
+    for i in range(4):
+        angle = t * 2 + i * 1.57
+        sx = cx + int(math.cos(angle) * w // 3)
+        sy = cy + int(math.sin(angle) * h // 3)
+        pygame.draw.circle(surface, (180, 255, 200), (sx, sy), 1)
+
+
+def draw_diamond_crown(surface, center, size, t):
+    """Draw a sparkling crown with diamond."""
+    cx, cy = int(center[0]), int(center[1])
+    s = max(8, int(size))
+    hs = s // 2
+    # Crown base
+    base_rect = (cx - hs, cy + hs // 4, s, hs // 2)
+    pygame.draw.rect(surface, (100, 180, 255), base_rect, border_radius=4)
+    pygame.draw.rect(surface, (60, 120, 200), base_rect, width=2, border_radius=4)
+    # Crown points
+    points_top = [(cx - hs, cy + hs // 4), (cx - hs // 2, cy - hs // 2),
+                  (cx, cy - hs // 6), (cx + hs // 2, cy - hs // 2),
+                  (cx + hs, cy + hs // 4)]
+    pygame.draw.polygon(surface, (100, 180, 255), points_top)
+    pygame.draw.polygon(surface, (60, 120, 200), points_top, width=2)
+    # Central diamond
+    d_r = max(3, s // 5)
+    diamond = [(cx, cy - d_r), (cx + d_r, cy), (cx, cy + d_r), (cx - d_r, cy)]
+    pygame.draw.polygon(surface, (220, 240, 255), diamond)
+    pygame.draw.polygon(surface, (160, 200, 255), diamond, width=1)
+    # Rainbow shimmer
+    hue_shift = (t * 2) % 6.28
+    sr = int(128 + 127 * math.sin(hue_shift))
+    sg = int(128 + 127 * math.sin(hue_shift + 2.09))
+    sb = int(128 + 127 * math.sin(hue_shift + 4.19))
+    pygame.draw.circle(surface, (sr, sg, sb), (cx, cy), max(2, d_r // 2))
+    # Sparkle
+    spark_x = cx + int(math.cos(t * 4) * hs * 0.6)
+    spark_y = cy - hs // 4 + int(math.sin(t * 3) * hs * 0.3)
+    pygame.draw.line(surface, WHITE, (spark_x - 3, spark_y), (spark_x + 3, spark_y), 1)
+    pygame.draw.line(surface, WHITE, (spark_x, spark_y - 3), (spark_x, spark_y + 3), 1)
+
+
+def draw_captains_medal(surface, center, size, t):
+    """Draw a gold medal with rotating star."""
+    cx, cy = int(center[0]), int(center[1])
+    s = max(8, int(size))
+    r = s // 2
+    # Medal circle
+    pygame.draw.circle(surface, (250, 205, 55), (cx, cy), r)
+    pygame.draw.circle(surface, (203, 151, 25), (cx, cy), r, width=2)
+    # Inner ring
+    pygame.draw.circle(surface, (255, 230, 120), (cx, cy), int(r * 0.75), width=1)
+    # Rotating star
+    star_angle = t * 1.5
+    star_r_outer = int(r * 0.55)
+    star_r_inner = int(r * 0.25)
+    star_pts = []
+    for i in range(10):
+        a = star_angle + i * math.pi / 5
+        rad = star_r_outer if i % 2 == 0 else star_r_inner
+        star_pts.append((cx + int(math.cos(a) * rad), cy + int(math.sin(a) * rad)))
+    pygame.draw.polygon(surface, (255, 240, 160), star_pts)
+    pygame.draw.polygon(surface, (180, 140, 40), star_pts, width=1)
+    # Shimmer
+    gx = cx + int(math.cos(t * 3.5) * r * 0.3)
+    gy = cy - int(abs(math.sin(t * 2.8)) * r * 0.3)
+    pygame.draw.circle(surface, WHITE, (gx, gy), max(1, r // 4))

@@ -82,6 +82,10 @@ class PresentationController:
         # The NEXT button rect (drawn by scenes / game)
         self.next_button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 70, 180, 54)
         self.next_hovered = False
+        # Cached font for audience cues (avoid per-frame SysFont lookup)
+        self._audience_font = pygame.font.SysFont("comicsansms", 36, bold=True)
+        # Pre-allocated banner surface for audience cues
+        self._banner_surf = pygame.Surface((WIDTH, 64), pygame.SRCALPHA)
 
     def current_step(self) -> PresentationStep | None:
         if 0 <= self.current_step_index < len(self.steps):
@@ -186,7 +190,8 @@ class PresentationController:
         """Draw a pulsing banner at bottom of screen."""
         pulse = 0.7 + 0.3 * abs(math.sin(t * 3))
         banner_h = 64
-        banner = pygame.Surface((WIDTH, banner_h), pygame.SRCALPHA)
+        banner = self._banner_surf
+        banner.fill((0, 0, 0, 0))
 
         bg_alpha = int(220 * pulse)
         banner.fill((255, 235, 59, bg_alpha))
@@ -203,7 +208,7 @@ class PresentationController:
         draw_text_outline(
             screen,
             text,
-            pygame.font.SysFont("comicsansms", 36, bold=True),
+            self._audience_font,
             BLACK,
             YELLOW,
             (WIDTH // 2, HEIGHT - banner_h - 70 + banner_h // 2),

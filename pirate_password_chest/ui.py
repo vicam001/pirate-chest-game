@@ -30,22 +30,43 @@ class FontBook:
         self.tiny = pygame.font.SysFont(FONT_NAME, FONT_TINY_SIZE, bold=True)
 
 
+_TEXT_CACHE: dict[tuple[int, str, tuple, tuple], pygame.Surface] = {}
+_WRAP_CACHE: dict[tuple[int, str, int], tuple[str, ...]] = {}
+
+
+def _prune_cache(cache, max_size):
+    if len(cache) > max_size:
+        cache.clear()
+
+
 def draw_text_outline(surface, text, font, color, outline, pos, center=True):
-    base = font.render(text, True, color)
-    outline_surf = font.render(text, True, outline)
+    key = (id(font), text, color, outline)
+    rendered = _TEXT_CACHE.get(key)
+    if rendered is None:
+        base = font.render(text, True, color)
+        outline_surf = font.render(text, True, outline)
+        rendered = pygame.Surface((base.get_width() + 4, base.get_height() + 4), pygame.SRCALPHA)
+        for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, 2), (-2, 2), (2, -2)]:
+            rendered.blit(outline_surf, (ox + 2, oy + 2))
+        rendered.blit(base, (2, 2))
+        _TEXT_CACHE[key] = rendered
+        _prune_cache(_TEXT_CACHE, 2048)
 
     if center:
-        rect = base.get_rect(center=pos)
+        rect = rendered.get_rect(center=pos)
     else:
-        rect = base.get_rect(topleft=pos)
+        rect = rendered.get_rect(topleft=pos)
 
-    for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, 2), (-2, 2), (2, -2)]:
-        surface.blit(outline_surf, rect.move(ox, oy))
-    surface.blit(base, rect)
+    surface.blit(rendered, rect)
     return rect
 
 
 def wrap_text(text, font, max_width):
+    key = (id(font), text, int(max_width))
+    cached = _WRAP_CACHE.get(key)
+    if cached is not None:
+        return list(cached)
+
     words = text.split(" ")
     lines = []
     line = ""
@@ -59,6 +80,8 @@ def wrap_text(text, font, max_width):
             line = word
     if line:
         lines.append(line)
+    _WRAP_CACHE[key] = tuple(lines)
+    _prune_cache(_WRAP_CACHE, 1024)
     return lines
 
 
