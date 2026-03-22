@@ -44,7 +44,10 @@ class SaveManager:
     def __init__(self, root_dir: str | Path):
         self.root_dir = Path(root_dir)
         self.path = self.root_dir / SAVE_FILE
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
         self.data = self._load_or_create()
 
     def _default_data(self):
@@ -144,10 +147,13 @@ class SaveManager:
         return data
 
     def _atomic_save(self, data):
-        tmp = self.path.with_suffix(".tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp, self.path)
+        try:
+            tmp = self.path.with_suffix(".tmp")
+            with tmp.open("w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, self.path)
+        except OSError:
+            pass
 
     @staticmethod
     def _clamp01(value):

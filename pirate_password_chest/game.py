@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 import sys
 from pathlib import Path
@@ -81,10 +82,12 @@ class PiratePasswordGame:
         # Presentation mode: fullscreen by default, create controller
         self.presentation: PresentationController | None = None
         if self.presentation_mode:
-            self.fullscreen = True
+            self.fullscreen = sys.platform != "emscripten"
             self.presentation = PresentationController()
         else:
             self.fullscreen = bool(self.save_manager.settings.get("fullscreen", False))
+            if sys.platform == "emscripten":
+                self.fullscreen = False
 
         self.mouse_virtual_pos = (WIDTH // 2, HEIGHT // 2)
         self.mouse_inside_canvas = True
@@ -117,6 +120,8 @@ class PiratePasswordGame:
             self._scaled_surface_size = None
 
     def toggle_fullscreen(self):
+        if sys.platform == "emscripten":
+            return
         self._apply_display_mode(not self.fullscreen)
         self.save_manager.set_settings(fullscreen=self.fullscreen)
 
@@ -213,7 +218,7 @@ class PiratePasswordGame:
                 self._overlay_cache[key] = overlay
         return overlay
 
-    def run(self):
+    async def run(self):
         save_accum = 0.0
         while self.running:
             dt = self.clock.tick(FPS) / 1000.0
@@ -295,9 +300,12 @@ class PiratePasswordGame:
                 self.save_manager.save()
                 save_accum = 0.0
 
+            await asyncio.sleep(0)
+
         self.save_manager.save()
         pygame.quit()
-        sys.exit()
+        if sys.platform != "emscripten":
+            sys.exit()
 
     def _update_fade(self, dt):
         if self._fade_direction == 0:
