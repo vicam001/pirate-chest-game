@@ -51,5 +51,19 @@ MIXER_BUFFER = 512
 PARENT_HOLD_SECONDS = 2.0
 PARENT_HOTSPOT = (792, 0, 108, 108)
 
+# Presentation mode font sizes (larger for projection)
+PRES_FONT_HUGE_SIZE = 80
+PRES_FONT_BIG_SIZE = 64
+PRES_FONT_MED_SIZE = 52
+PRES_FONT_SMALL_SIZE = 42
+PRES_FONT_TINY_SIZE = 32
+
+# Audience cue colors
+AUDIENCE_CUE_BG = (255, 235, 59)
+AUDIENCE_CUE_BORDER = (245, 127, 23)
+
+# Characters used in storyline
+STORY_CHARACTERS = ["captain", "nina", "gibbs"]
+
 # Difficulty labels
 DIFFICULTY_ORDER = ["easy", "medium", "hard", "expert"]

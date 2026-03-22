@@ -460,12 +460,73 @@ class SpriteManager:
     def __init__(self, root_dir: str | Path):
         self.root_dir = Path(root_dir)
         self.animations: dict[tuple[str, str], Animation] = {}
+        self.portraits: dict[str, pygame.Surface] = {}  # character_id -> surface
+        self.portraits_large: dict[str, pygame.Surface] = {}
         self._build_all()
+        self._load_character_portraits()
 
     def _build_all(self):
         self._build_parrot_animations()
         self._build_chest_animations()
         self._build_world_animations()
+
+    def _load_character_portraits(self):
+        """Load SVG character portraits for storyline characters."""
+        from .dialogue import CHARACTERS
+
+        char_dir = self.root_dir / "assets" / "characters"
+
+        for char_id, info in CHARACTERS.items():
+            svg_name = info.get("svg")
+            if svg_name is None:
+                continue
+
+            svg_path = char_dir / svg_name
+            surface = self._try_load_svg(svg_path, (120, 120))
+            surface_large = self._try_load_svg(svg_path, (200, 200))
+
+            if surface is None:
+                surface = self._make_fallback_portrait(info["name"], info["color"], 120)
+            if surface_large is None:
+                surface_large = self._make_fallback_portrait(info["name"], info["color"], 200)
+
+            self.portraits[char_id] = surface
+            self.portraits_large[char_id] = surface_large
+
+    def _try_load_svg(self, path: Path, size: tuple[int, int]) -> pygame.Surface | None:
+        """Try to load SVG using cairosvg, return None if unavailable."""
+        if not path.exists():
+            return None
+        try:
+            import cairosvg
+            import io
+            png_data = cairosvg.svg2png(
+                url=str(path),
+                output_width=size[0],
+                output_height=size[1],
+            )
+            return pygame.image.load(io.BytesIO(png_data)).convert_alpha()
+        except (ImportError, Exception):
+            return None
+
+    @staticmethod
+    def _make_fallback_portrait(name: str, color: tuple, size: int) -> pygame.Surface:
+        """Draw a colored circle with the character's initial as fallback."""
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        radius = size // 2
+        pygame.draw.circle(surf, color, (radius, radius), radius)
+        pygame.draw.circle(surf, BLACK, (radius, radius), radius, width=3)
+        font = pygame.font.SysFont("comicsansms", size // 2, bold=True)
+        initial = font.render(name[0], True, WHITE)
+        rect = initial.get_rect(center=(radius, radius))
+        surf.blit(initial, rect)
+        return surf
+
+    def get_portrait(self, char_id: str, large: bool = False) -> pygame.Surface | None:
+        """Get a character portrait surface."""
+        if large:
+            return self.portraits_large.get(char_id)
+        return self.portraits.get(char_id)
 
     def _get_or_generate_sequence(self, group, anim, frame_size, generator, count, fps):
         frames = self._try_load_external(group, anim, frame_size)
@@ -493,21 +554,21 @@ class SpriteManager:
         return frames
 
     def _build_parrot_animations(self):
-        size = (240, 220)
+        size = (280, 260)
 
         def gen_factory(emotion):
             def _gen(i, count):
                 surf = pygame.Surface(size, pygame.SRCALPHA)
                 t = i / max(1, count)
                 x = size[0] // 2
-                y = 120
+                y = 130
                 draw_parrot_fallback(surf, x, y, t * 6.28, emotion=emotion)
                 return surf
 
             return _gen
 
         for emotion in ("idle", "talk", "angry", "surprised", "cheer"):
-            self._get_or_generate_sequence("parrot", emotion, size, gen_factory(emotion), count=8, fps=10.0)
+            self._get_or_generate_sequence("parrot", emotion, size, gen_factory(emotion), count=12, fps=10.0)
 
     def _build_chest_animations(self):
         size = (620, 330)

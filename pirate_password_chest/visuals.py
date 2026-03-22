@@ -222,40 +222,216 @@ def draw_chest_fallback(
 def draw_parrot_fallback(surface, x, y, t, emotion="happy"):
     wing_bob = int(math.sin(t * 9) * 10)
     blink = math.sin(t * 2.7) > 0.97
+    breath = math.sin(t * 3.2) * 2  # gentle breathing
 
-    pygame.draw.line(surface, (240, 160, 70), (x - 16, y + 66), (x - 14, y + 85), 5)
-    pygame.draw.line(surface, (240, 160, 70), (x + 6, y + 66), (x + 8, y + 85), 5)
+    # ── Tail feathers (drawn first, behind the body) ──
+    tail_sway = math.sin(t * 4.5) * 5
+    for i, (length, color) in enumerate([
+        (58, (30, 140, 65)), (52, (200, 60, 50)), (46, (48, 120, 195)),
+        (40, (220, 190, 40)), (34, (30, 155, 75)),
+    ]):
+        angle = -1.8 + i * 0.22 + math.sin(t * 3.8 + i * 0.6) * 0.08
+        tx = x - 28 + int(tail_sway * 0.3) + i * 4
+        ty = y + 60 + i * 2
+        ex = tx + int(math.cos(angle) * length)
+        ey = ty + int(math.sin(angle) * length)
+        pygame.draw.line(surface, color, (tx, ty), (ex, ey), max(3, 6 - i))
+        # Feather tip barb
+        pygame.draw.circle(surface, color, (ex, ey), max(2, 4 - i))
 
-    pygame.draw.ellipse(surface, (58, 205, 95), (x - 62, y - 18, 128, 148))
-    pygame.draw.ellipse(surface, (95, 230, 127), (x - 35, y + 18, 64, 86))
+    # ── Feet with toes ──
+    foot_color = (240, 165, 55)
+    foot_dark = (200, 130, 40)
+    for fx, fy_off in [(-14, 0), (8, 0)]:
+        fy = y + 68
+        # Leg
+        pygame.draw.line(surface, foot_color, (x + fx, fy), (x + fx + 2, fy + 18), 5)
+        pygame.draw.line(surface, foot_dark, (x + fx, fy), (x + fx + 2, fy + 18), 2)
+        # Three toes
+        toe_y = fy + 18
+        toe_x = x + fx + 2
+        for angle in (-0.5, 0.0, 0.5):
+            ex = toe_x + int(math.cos(angle) * 10)
+            ey = toe_y + int(math.sin(angle + 1.0) * 6) + 2
+            pygame.draw.line(surface, foot_color, (toe_x, toe_y), (ex, ey), 3)
+            pygame.draw.circle(surface, foot_dark, (ex, ey), 2)
 
-    wing_h = 66 + wing_bob
-    pygame.draw.ellipse(surface, (36, 168, 82), (x - 90, y + 12, 50, wing_h))
-    pygame.draw.ellipse(surface, (36, 168, 82), (x + 40, y + 12, 50, wing_h))
+    # ── Body (main green with feather-texture shading) ──
+    body_green = (52, 195, 88)
+    body_light = (88, 225, 118)
+    body_dark = (38, 158, 68)
+    body_rect = (x - 52, y - 14 + int(breath), 108, 140)
+    pygame.draw.ellipse(surface, body_green, body_rect)
+    # Feather texture lines on body
+    for fy_off in range(16, 120, 14):
+        fy_pos = y - 14 + fy_off + int(breath)
+        wave = int(math.sin(fy_off * 0.3 + t * 2) * 3)
+        pygame.draw.arc(surface, body_dark,
+                        (x - 36 + wave, fy_pos, 76, 10), 0.3, math.pi - 0.3, 1)
+    # Belly highlight
+    belly = (x - 30, y + 22 + int(breath), 56, 72)
+    pygame.draw.ellipse(surface, body_light, belly)
+    pygame.draw.ellipse(surface, (75, 210, 105), belly, width=1)
 
-    pygame.draw.circle(surface, (62, 214, 100), (x, y - 24), 54)
-    pygame.draw.ellipse(surface, (34, 34, 38), (x - 62, y - 82, 124, 34))
-    pygame.draw.rect(surface, (40, 40, 46), (x - 42, y - 106, 84, 32), border_radius=8)
-    pygame.draw.rect(surface, (220, 190, 70), (x - 7, y - 100, 14, 18), border_radius=4)
+    # ── Wings ──
+    wing_green = (32, 162, 75)
+    wing_tip = (28, 130, 58)
+    wing_highlight = (60, 190, 100)
+    wing_h = 62 + wing_bob
+    # Left wing
+    lw = (x - 78, y + 8, 44, wing_h)
+    pygame.draw.ellipse(surface, wing_green, lw)
+    pygame.draw.ellipse(surface, wing_highlight, (lw[0] + 6, lw[1] + 4, 28, wing_h - 16))
+    pygame.draw.ellipse(surface, wing_tip, lw, width=2)
+    # Wing feather lines
+    for fi in range(3):
+        fy = lw[1] + 18 + fi * 16
+        pygame.draw.line(surface, wing_tip, (lw[0] + 8, fy), (lw[0] + 36, fy + 4), 1)
+    # Right wing
+    rw = (x + 34, y + 8, 44, wing_h)
+    pygame.draw.ellipse(surface, wing_green, rw)
+    pygame.draw.ellipse(surface, wing_highlight, (rw[0] + 6, rw[1] + 4, 28, wing_h - 16))
+    pygame.draw.ellipse(surface, wing_tip, rw, width=2)
+    for fi in range(3):
+        fy = rw[1] + 18 + fi * 16
+        pygame.draw.line(surface, wing_tip, (rw[0] + 8, fy), (rw[0] + 36, fy + 4), 1)
 
-    pygame.draw.polygon(surface, ORANGE, [(x + 6, y - 20), (x + 54, y - 6), (x + 7, y + 8)])
+    # ── Head ──
+    head_green = (56, 208, 96)
+    head_light = (80, 225, 125)
+    head_r = 48
+    hx, hy = x + 2, y - 22
+    pygame.draw.circle(surface, head_green, (hx, hy), head_r)
+    # Forehead highlight
+    pygame.draw.circle(surface, head_light, (hx - 8, hy - 18), 22)
+    # Cheek feather detail
+    pygame.draw.arc(surface, body_dark, (hx - 34, hy + 2, 30, 18), 0.4, math.pi - 0.4, 1)
+    pygame.draw.arc(surface, body_dark, (hx - 28, hy + 14, 24, 14), 0.4, math.pi - 0.4, 1)
 
-    pygame.draw.circle(surface, WHITE, (x - 14, y - 38), 15)
+    # ── Pirate bandana ──
+    bandana_red = (200, 52, 42)
+    bandana_dark = (160, 38, 30)
+    bandana_highlight = (225, 80, 65)
+    # Main bandana wrap
+    band_pts = [
+        (hx - 44, hy - 18), (hx + 44, hy - 18),
+        (hx + 48, hy - 6), (hx - 48, hy - 6),
+    ]
+    pygame.draw.polygon(surface, bandana_red, band_pts)
+    pygame.draw.polygon(surface, bandana_dark, band_pts, width=2)
+    # Bandana top curve
+    pygame.draw.arc(surface, bandana_red, (hx - 44, hy - 38, 88, 42), 0, math.pi, 0)
+    pygame.draw.arc(surface, bandana_dark, (hx - 44, hy - 38, 88, 42), 0.1, math.pi - 0.1, 2)
+    # Highlight stripe
+    pygame.draw.line(surface, bandana_highlight, (hx - 30, hy - 14), (hx + 30, hy - 14), 2)
+    # Hanging knot tails on the right side
+    knot_wave = math.sin(t * 5.0) * 3
+    pygame.draw.line(surface, bandana_red, (hx + 38, hy - 10),
+                     (hx + 52 + int(knot_wave), hy + 8), 4)
+    pygame.draw.line(surface, bandana_dark, (hx + 40, hy - 10),
+                     (hx + 56 + int(knot_wave * 0.7), hy + 14), 3)
+    # Small white skull on bandana
+    skull_x, skull_y = hx, hy - 14
+    pygame.draw.circle(surface, (230, 225, 215), (skull_x, skull_y), 6)
+    pygame.draw.circle(surface, BLACK, (skull_x - 2, skull_y - 1), 1)
+    pygame.draw.circle(surface, BLACK, (skull_x + 2, skull_y - 1), 1)
+    pygame.draw.line(surface, BLACK, (skull_x - 3, skull_y + 3), (skull_x + 3, skull_y + 3), 1)
+
+    # ── Beak (detailed curved beak) ──
+    beak_base = (245, 175, 45)
+    beak_tip = (220, 140, 30)
+    beak_highlight = (255, 210, 90)
+    # Upper beak (larger, curved)
+    upper_beak = [
+        (hx + 14, hy - 4), (hx + 56, hy + 4), (hx + 50, hy + 12), (hx + 14, hy + 6),
+    ]
+    pygame.draw.polygon(surface, beak_base, upper_beak)
+    pygame.draw.polygon(surface, beak_tip, upper_beak, width=2)
+    # Beak ridge line
+    pygame.draw.line(surface, beak_highlight, (hx + 16, hy - 2), (hx + 48, hy + 5), 2)
+    # Nostril
+    pygame.draw.circle(surface, beak_tip, (hx + 28, hy + 2), 2)
+    # Lower beak
+    lower_beak = [
+        (hx + 14, hy + 8), (hx + 42, hy + 14), (hx + 14, hy + 14),
+    ]
+    pygame.draw.polygon(surface, (215, 155, 35), lower_beak)
+    pygame.draw.polygon(surface, beak_tip, lower_beak, width=1)
+    # Beak tip hook
+    pygame.draw.arc(surface, beak_tip, (hx + 46, hy + 2, 14, 16), -0.5, 1.2, 2)
+
+    # ── Eyes (large, expressive, cartoony) ──
+    # Eye whites (slightly different sizes for character)
+    left_eye_x, left_eye_y = hx - 16, hy - 6
+    pygame.draw.ellipse(surface, WHITE, (left_eye_x - 14, left_eye_y - 13, 26, 24))
+    pygame.draw.ellipse(surface, (235, 240, 235), (left_eye_x - 12, left_eye_y - 11, 22, 20))
+
     if blink:
-        pygame.draw.line(surface, BLACK, (x - 24, y - 38), (x - 4, y - 38), 4)
+        # Blink — curved line
+        pygame.draw.arc(surface, BLACK, (left_eye_x - 12, left_eye_y - 6, 22, 12),
+                        0.2, math.pi - 0.2, 3)
     else:
-        pygame.draw.circle(surface, BLACK, (x - 14, y - 38), 7)
+        # Iris
+        iris_color = (40, 35, 30)
+        pupil_x = left_eye_x
+        pupil_y = left_eye_y
+        # Slight look direction based on emotion
+        if emotion == "surprised":
+            pupil_y -= 2
+        elif emotion == "angry":
+            pupil_x += 2
+        pygame.draw.circle(surface, iris_color, (pupil_x, pupil_y), 8)
+        # Pupil
+        pygame.draw.circle(surface, BLACK, (pupil_x, pupil_y), 5)
+        # Eye shine (two highlights)
+        pygame.draw.circle(surface, WHITE, (pupil_x + 3, pupil_y - 3), 3)
+        pygame.draw.circle(surface, (220, 230, 240), (pupil_x - 2, pupil_y + 2), 1)
+    # Eye outline
+    pygame.draw.ellipse(surface, BLACK, (left_eye_x - 14, left_eye_y - 13, 26, 24), width=2)
 
-    pygame.draw.circle(surface, BLACK, (x + 20, y - 38), 16)
-    pygame.draw.line(surface, BLACK, (x + 4, y - 48), (x + 36, y - 28), 5)
-
+    # ── Emotion-based expressions ──
     if emotion == "angry":
-        pygame.draw.line(surface, BLACK, (x - 24, y - 55), (x - 5, y - 62), 5)
-        pygame.draw.arc(surface, BLACK, (x - 20, y - 8, 35, 28), math.pi * 0.1, math.pi * 0.95, 4)
+        # Angry eyebrows (thick, angled down)
+        pygame.draw.line(surface, BLACK, (left_eye_x - 14, left_eye_y - 20),
+                         (left_eye_x + 8, left_eye_y - 14), 4)
+        # Frown
+        pygame.draw.arc(surface, BLACK, (hx - 12, hy + 16, 32, 20),
+                        math.pi * 0.15, math.pi * 0.85, 3)
+        # Ruffled feathers on head
+        for i in range(3):
+            fx = hx - 20 + i * 16
+            pygame.draw.line(surface, body_dark, (fx, hy - 36), (fx + 4, hy - 46), 2)
     elif emotion == "surprised":
-        pygame.draw.circle(surface, BLACK, (x - 2, y - 6), 9)
+        # Raised eyebrow
+        pygame.draw.arc(surface, BLACK, (left_eye_x - 16, left_eye_y - 26, 30, 16),
+                        0.2, math.pi - 0.2, 3)
+        # Open mouth (beak gap)
+        pygame.draw.ellipse(surface, (60, 35, 25), (hx + 18, hy + 10, 18, 10))
     elif emotion == "cheer":
-        pygame.draw.arc(surface, BLACK, (x - 26, y - 20, 44, 34), 0.1, math.pi - 0.1, 4)
-        pygame.draw.arc(surface, BLACK, (x - 30, y - 46, 18, 11), math.pi, math.pi * 2, 3)
+        # Happy eyebrows (curved up)
+        pygame.draw.arc(surface, BLACK, (left_eye_x - 14, left_eye_y - 24, 26, 14),
+                        0.3, math.pi - 0.3, 2)
+        # Big smile
+        pygame.draw.arc(surface, BLACK, (hx - 16, hy + 10, 38, 24),
+                        0.15, math.pi - 0.15, 3)
+        # Rosy cheek
+        pygame.draw.circle(surface, (255, 160, 140, 90), (hx - 26, hy + 10), 8)
+        # Sparkle near eye
+        sparkle_phase = (t * 4) % 6.28
+        sx = left_eye_x + 20 + int(math.cos(sparkle_phase) * 4)
+        sy = left_eye_y - 16 + int(math.sin(sparkle_phase) * 3)
+        pygame.draw.line(surface, (255, 255, 200), (sx - 4, sy), (sx + 4, sy), 2)
+        pygame.draw.line(surface, (255, 255, 200), (sx, sy - 4), (sx, sy + 4), 2)
+    elif emotion == "talk":
+        # Slightly open beak — mouth gap
+        pygame.draw.ellipse(surface, (70, 40, 28), (hx + 20, hy + 10, 14, 8))
+        # Normal eyebrow
+        pygame.draw.arc(surface, BLACK, (left_eye_x - 12, left_eye_y - 22, 24, 12),
+                        0.3, math.pi - 0.3, 2)
     else:
-        pygame.draw.arc(surface, BLACK, (x - 21, y - 15, 35, 26), 0.15, math.pi - 0.15, 4)
+        # Default happy — gentle smile
+        pygame.draw.arc(surface, BLACK, (hx - 10, hy + 12, 28, 18),
+                        0.2, math.pi - 0.2, 2)
+
+    # ── Body outline for definition ──
+    pygame.draw.ellipse(surface, body_dark, body_rect, width=2)

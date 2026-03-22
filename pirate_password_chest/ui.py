@@ -248,3 +248,47 @@ class DialWheel:
 def draw_panel(surface, rect, bg_color=(255, 243, 203), border_color=(70, 45, 22)):
     pygame.draw.rect(surface, bg_color, rect, border_radius=24)
     pygame.draw.rect(surface, border_color, rect, width=6, border_radius=24)
+
+
+def draw_dialogue_panel(surface, fonts, character_name, text, portrait=None,
+                        color=(255, 243, 203), y=None, width_pct=0.85):
+    """Draw a large dialogue panel with character portrait and text.
+
+    Designed for readability on a projector -- wider, taller, larger text.
+    """
+    from .constants import HEIGHT, WIDTH as SCREEN_WIDTH
+
+    panel_w = int(SCREEN_WIDTH * width_pct)
+    panel_h = 140
+    panel_x = (SCREEN_WIDTH - panel_w) // 2
+    panel_y = y if y is not None else HEIGHT - panel_h - 20
+
+    rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+    draw_panel(surface, rect, bg_color=color, border_color=(70, 45, 22))
+
+    # Portrait circle
+    portrait_x = panel_x + 80
+    portrait_y = panel_y + panel_h // 2
+    if portrait is not None:
+        pr = portrait.get_rect(center=(portrait_x, portrait_y))
+        # Clip to circle
+        pygame.draw.circle(surface, (70, 45, 22), (portrait_x, portrait_y), 52, width=4)
+        surface.blit(portrait, pr)
+    else:
+        pygame.draw.circle(surface, (200, 200, 200), (portrait_x, portrait_y), 48)
+        pygame.draw.circle(surface, (70, 45, 22), (portrait_x, portrait_y), 48, width=3)
+
+    # Character name
+    name_x = portrait_x + 70
+    draw_text_outline(surface, character_name, fonts.tiny, YELLOW, BLACK,
+                      (name_x, panel_y + 22), center=False)
+
+    # Text (wrapped)
+    text_x = name_x
+    text_max_w = panel_w - (text_x - panel_x) - 30
+    lines = wrap_text(text, fonts.small, text_max_w)
+    yy = panel_y + 52
+    for line in lines[:3]:
+        draw_text_outline(surface, line, fonts.small, BLACK, WHITE,
+                          (text_x, yy), center=False)
+        yy += 34

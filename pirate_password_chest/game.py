@@ -8,15 +8,26 @@ from pathlib import Path
 import pygame
 
 from .constants import FPS, HEIGHT, TITLE, WIDTH
+from .dialogue import DialogueManager
 from .difficulty import DifficultyManager
 from .managers import AudioManager, SaveManager, SpriteManager
-from .scenes import BuilderScene, CrackScene, LandingScene, LessonScene, ParentReportScene, VoyageIntroScene
+from .presentation import PresentationController
+from .scenes import (
+    BuilderScene,
+    CrackScene,
+    FinaleScene,
+    LandingScene,
+    LessonScene,
+    ParentReportScene,
+    VoyageIntroScene,
+)
 from .ui import FontBook
 
 
 class PiratePasswordGame:
-    def __init__(self, root_dir: str | Path):
+    def __init__(self, root_dir: str | Path, presentation: bool = False):
         self.root_dir = Path(root_dir)
+        self.presentation_mode = presentation
 
         pygame.init()
         pygame.display.set_caption(TITLE)
@@ -38,6 +49,8 @@ class PiratePasswordGame:
         self.sprite_manager = SpriteManager(self.root_dir)
         self.difficulty_manager = DifficultyManager()
 
+        self.dialogue_manager = DialogueManager()
+
         self.current_difficulty = "easy"
         self.last_round_result = None
 
@@ -46,12 +59,29 @@ class PiratePasswordGame:
         self.current_scene = None
         self.running = True
 
-        self.fullscreen = bool(self.save_manager.settings.get("fullscreen", False))
+        # Scene transition fade
+        self._fade_alpha = 0
+        self._fade_direction = 0  # -1 fading out, 1 fading in, 0 none
+        self._fade_speed = 600  # alpha per second
+        self._pending_scene = None
+        self._pending_payload = None
+
+        # Presentation mode: fullscreen by default, create controller
+        self.presentation: PresentationController | None = None
+        if self.presentation_mode:
+            self.fullscreen = True
+            self.presentation = PresentationController()
+        else:
+            self.fullscreen = bool(self.save_manager.settings.get("fullscreen", False))
+
         self.mouse_virtual_pos = (WIDTH // 2, HEIGHT // 2)
         self.mouse_inside_canvas = True
         self._apply_display_mode(self.fullscreen)
 
-        self.switch_scene("voyage_intro")
+        if self.presentation and self.presentation.active:
+            self.presentation.start(self)
+        else:
+            self.switch_scene("voyage_intro")
 
     def _apply_display_mode(self, fullscreen: bool):
         self.fullscreen = bool(fullscreen)
@@ -102,6 +132,23 @@ class PiratePasswordGame:
         return pygame.event.Event(event.type, event_dict)
 
     def switch_scene(self, name, payload=None):
+        # If there's already a scene and no fade in progress, trigger a fade-out first
+        if self.current_scene is not None and self._fade_direction == 0:
+            self._pending_scene = name
+            self._pending_payload = payload
+            self._fade_direction = -1  # fade out
+            self._fade_alpha = 0
+            return
+
+        # If a fade is already in progress, override the pending scene
+        if self._fade_direction != 0 and self.current_scene is not None:
+            self._pending_scene = name
+            self._pending_payload = payload
+            return
+
+        self._do_switch_scene(name, payload)
+
+    def _do_switch_scene(self, name, payload=None):
         if name == "voyage_intro":
             self.current_scene = VoyageIntroScene(self)
         elif name == "landing":
@@ -114,10 +161,22 @@ class PiratePasswordGame:
             self.current_scene = BuilderScene(self)
         elif name == "parent_report":
             self.current_scene = ParentReportScene(self)
+        elif name == "finale":
+            self.current_scene = FinaleScene(self)
         else:
             raise ValueError(f"Unknown scene: {name}")
 
         self.current_scene.enter(payload)
+
+        # Start fade-in
+        self._fade_direction = 1
+        self._fade_alpha = 255
+
+        # Start dialogue sequence for this step if in presentation mode
+        if self.presentation and self.presentation.active:
+            step = self.presentation.current_step()
+            if step and step.dialogue_on_enter:
+                self.dialogue_manager.start(step.dialogue_on_enter)
 
     def _present_frame(self):
         self.display_surface.fill((8, 10, 22))
@@ -152,13 +211,48 @@ class PiratePasswordGame:
                 if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
                     event = self._translate_mouse_event(event)
 
+                # Presentation controller gets first crack at events
+                if self.presentation and self.presentation.active:
+                    # Advance dialogue on click/space when dialogue is active
+                    if self.dialogue_manager.active:
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            self.dialogue_manager.advance()
+                            continue
+                        if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_RIGHT):
+                            self.dialogue_manager.advance()
+                            continue
+                    elif self.presentation.handle_event(event, self):
+                        continue
+
                 self.current_scene.handle_event(event)
 
             if not self.running:
                 break
 
+            # Update dialogue manager
+            self.dialogue_manager.update(dt)
+
             self.current_scene.update(dt)
+
+            # Check if scene completed (for presentation auto-advance)
+            if self.presentation and self.presentation.active:
+                if hasattr(self.current_scene, 'completed') and self.current_scene.completed:
+                    self.presentation.notify_scene_complete(self)
+
             self.current_scene.draw(self.screen)
+
+            # Draw presentation overlay (NEXT button, audience cues)
+            if self.presentation and self.presentation.active and not self.dialogue_manager.active:
+                t = pygame.time.get_ticks() / 1000.0
+                self.presentation.draw_overlay(self.screen, self.fonts, t)
+
+            # Draw dialogue panel on top if active
+            if self.dialogue_manager.active:
+                self._draw_dialogue_overlay()
+
+            # Scene transition fade
+            self._update_fade(dt)
+
             self._present_frame()
             pygame.display.flip()
 
@@ -169,3 +263,95 @@ class PiratePasswordGame:
         self.save_manager.save()
         pygame.quit()
         sys.exit()
+
+    def _update_fade(self, dt):
+        if self._fade_direction == 0:
+            return
+
+        if self._fade_direction == -1:
+            # Fading out (alpha increasing)
+            self._fade_alpha = min(255, self._fade_alpha + int(self._fade_speed * dt))
+            if self._fade_alpha >= 255:
+                # Fully faded out -- switch scene
+                self._fade_direction = 0
+                if self._pending_scene:
+                    name = self._pending_scene
+                    payload = self._pending_payload
+                    self._pending_scene = None
+                    self._pending_payload = None
+                    self._do_switch_scene(name, payload)
+        elif self._fade_direction == 1:
+            # Fading in (alpha decreasing)
+            self._fade_alpha = max(0, self._fade_alpha - int(self._fade_speed * dt))
+            if self._fade_alpha <= 0:
+                self._fade_direction = 0
+
+        if self._fade_alpha > 0:
+            fade_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            fade_surf.fill((0, 0, 0, self._fade_alpha))
+            self.screen.blit(fade_surf, (0, 0))
+
+    def _draw_dialogue_overlay(self):
+        """Draw the current dialogue line as a large panel overlay."""
+        from .ui import draw_dialogue_panel, draw_text_outline
+        from .dialogue import CHARACTERS
+
+        line = self.dialogue_manager.current_line()
+        if line is None:
+            return
+
+        import math
+
+        char_info = CHARACTERS.get(line.character, {})
+        char_name = char_info.get("name", line.character.title())
+        char_color = char_info.get("color", (200, 200, 200))
+        portrait = self.sprite_manager.get_portrait(line.character)
+
+        # Semi-transparent overlay behind dialogue
+        shade = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        shade.fill((0, 0, 0, 100))
+        self.screen.blit(shade, (0, 0))
+
+        # Determine panel color tint based on character
+        panel_bg = (
+            min(255, char_color[0] // 3 + 200),
+            min(255, char_color[1] // 3 + 200),
+            min(255, char_color[2] // 3 + 180),
+        )
+
+        draw_dialogue_panel(
+            self.screen, self.fonts,
+            char_name, line.text,
+            portrait=portrait,
+            color=panel_bg,
+            y=HEIGHT - 170,
+        )
+
+        # Character name in their color above the panel
+        t = pygame.time.get_ticks() / 1000.0
+        name_glow = (
+            min(255, char_color[0] + 40),
+            min(255, char_color[1] + 40),
+            min(255, char_color[2] + 40),
+        )
+        draw_text_outline(
+            self.screen, char_name, self.fonts.small,
+            name_glow, (0, 0, 0),
+            (WIDTH // 2, HEIGHT - 185), center=True,
+        )
+
+        # Audience cue if present
+        if line.audience_cue and self.presentation_mode:
+            self.presentation._draw_audience_cue(self.screen, line.audience_cue, t)
+
+        # "Click to continue" hint with pulsing
+        pulse = int(128 + 127 * math.sin(t * 3))
+        draw_text_outline(
+            self.screen,
+            "Click or press SPACE to continue",
+            self.fonts.tiny,
+            (pulse, pulse, pulse),
+            (0, 0, 0),
+            (WIDTH // 2, HEIGHT - 10),
+            center=True,
+        )
