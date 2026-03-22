@@ -41,10 +41,19 @@ jobs:
           find . -name '*.py' -not -path './build/*' -print0 | xargs -0 sed -i 's/\.wav/.ogg/g'
 
       - name: Install pygbag
-        run: pip install pygbag
+        run: pip install pygbag --upgrade
+
+      - name: Show pygbag version
+        run: pip show pygbag
+
+      - name: Clean old build artifacts
+        run: rm -rf build/ __pycache__/
 
       - name: Build with pygbag
         run: python -m pygbag --build .
+
+      - name: List build output
+        run: ls -la build/web/
 
       - name: Add .nojekyll
         run: touch build/web/.nojekyll
