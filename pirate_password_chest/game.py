@@ -23,6 +23,7 @@ from .scenes import (
     VoyageIntroScene,
 )
 from .ui import FontBook, draw_dialogue_panel, draw_text_outline
+from .scroll_panel import ScrollPanel
 from .virgil import Virgil
 
 
@@ -58,6 +59,9 @@ class PiratePasswordGame:
 
         # Virgil — the star character, shared across all scenes
         self.virgil = Virgil(x=700, y=350)
+
+        # Ancient Pirate Scroll — single text display panel
+        self.scroll = ScrollPanel()
 
         self.current_difficulty = "easy"
         self.last_round_result = None
@@ -266,6 +270,11 @@ class PiratePasswordGame:
                     self.presentation.notify_scene_complete(self)
 
             self.current_scene.draw(self.screen)
+
+            # Draw the Ancient Pirate Scroll on top of scene
+            t = pygame.time.get_ticks() / 1000.0
+            self.scroll.update(dt)
+            self.scroll.draw(self.screen, t)
 
             # Draw presentation overlay (NEXT button, audience cues)
             if self.presentation and self.presentation.active and not self.dialogue_manager.active:

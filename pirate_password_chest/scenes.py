@@ -111,7 +111,11 @@ class BaseScene:
         for p in particles:
             p.draw(self.game.screen)
 
-    def draw_scene_virgil(self, x, y, text=None, show_bubble=True):
+    def scroll_message(self, text, style="dialogue", **kwargs):
+        """Route text to the Ancient Pirate Scroll panel."""
+        self.game.scroll.show_message(text, style=style, **kwargs)
+
+    def draw_scene_virgil(self, x, y, text=None, show_bubble=False):
         virgil = self.game.virgil
         virgil.set_position(x, y)
         if text:
@@ -187,7 +191,7 @@ class VoyageIntroScene(BaseScene):
         ]
 
         self.progress = 0.0
-        self.travel_speed = 0.095
+        self.travel_speed = 0.045
         self.question_cursor = 0
         self.awaiting_choice = False
         self.active_question = None
@@ -195,6 +199,13 @@ class VoyageIntroScene(BaseScene):
         self.response_timer = 0.0
         self.disembark_ready = False
         self.auto_land_timer = 0.0
+
+        # Shark patrol state
+        self.shark_angle = 0.0  # current angle on elliptical patrol path
+        self.shark_depth = 0.0  # 0 = surfaced, 1 = fully submerged
+        self.shark_surfaced = True
+        self.shark_dive_timer = random.uniform(4.0, 7.0)
+        self.shark_transition_speed = 0.0  # >0 diving, <0 surfacing
 
         # Answer flash effect
         self.flash_timer = 0.0
@@ -226,12 +237,20 @@ class VoyageIntroScene(BaseScene):
         self.active_question = None
         self.active_character = None
         self.status_line = "Captain's Log: Set sail for Password Island! Protect your treasure!"
+        self.scroll_message(self.status_line, "dialogue")
         self.response_timer = 0.0
         self.disembark_ready = False
         self.auto_land_timer = 0.0
 
         self.flash_timer = 0.0
         self.flash_color = None
+
+        # Shark patrol reset
+        self.shark_angle = random.uniform(0, math.pi * 2)
+        self.shark_depth = 0.0
+        self.shark_surfaced = True
+        self.shark_dive_timer = random.uniform(4.0, 7.0)
+        self.shark_transition_speed = 0.0
 
         # Presentation mode: title phase shows only dialogue, skip voyage
         self.presentation_phase = None
@@ -271,6 +290,7 @@ class VoyageIntroScene(BaseScene):
         self.choice_a_button.label = self.active_question["choices"][0]
         self.choice_b_button.label = self.active_question["choices"][1]
         self.status_line = self.active_question["question"]
+        self.scroll_message(self.status_line, "dialogue")
         self.game.audio.play_sfx("dial")
 
     def _resolve_choice(self, idx):
@@ -280,9 +300,11 @@ class VoyageIntroScene(BaseScene):
         self.status_line = self.active_question["responses"][idx]
         self.response_timer = 2.2
         if idx == self.active_question["best"]:
+            self.scroll_message(self.status_line, "teaching", important=True)
             self.game.audio.play_sfx("success")
             self.flash_color = GREEN
         else:
+            self.scroll_message(self.status_line, "warning")
             self.game.audio.play_sfx("clunk")
             self.flash_color = RED
         self.flash_timer = 0.5
@@ -614,77 +636,155 @@ class VoyageIntroScene(BaseScene):
         rect = rotated.get_rect(center=(int(pos[0]), int(pos[1])))
         screen.blit(rotated, rect)
 
-    def _draw_shark(self, screen, x, y, t):
-        # Body sway
-        sway = math.sin(t * 4.0) * 3.0
-        bx = int(x + sway)
-        by = int(y)
+    def _update_shark(self, dt):
+        """Advance shark patrol and dive/surface cycle."""
+        # Advance along elliptical patrol path (slow, lazy)
+        self.shark_angle += dt * 0.35
+        if self.shark_angle > math.pi * 2:
+            self.shark_angle -= math.pi * 2
 
-        # Tail fin (behind body, animated swish)
-        tail_angle = math.sin(t * 8.0) * 12.0
-        tail_pts = [
-            (bx - 42, by + 2),
-            (int(bx - 62 + tail_angle), by - 14),
-            (int(bx - 58 + tail_angle), by + 16),
-        ]
-        pygame.draw.polygon(screen, (100, 115, 120), tail_pts)
-        pygame.draw.polygon(screen, (80, 92, 98), tail_pts, width=2)
+        # Dive/surface timer
+        self.shark_dive_timer -= dt
+        if self.shark_dive_timer <= 0:
+            if self.shark_surfaced:
+                # Start diving
+                self.shark_surfaced = False
+                self.shark_transition_speed = 1.0  # diving
+                self.shark_dive_timer = random.uniform(3.0, 5.0)
+            else:
+                # Start surfacing
+                self.shark_surfaced = True
+                self.shark_transition_speed = -1.0  # surfacing
+                self.shark_dive_timer = random.uniform(4.0, 7.0)
 
-        # Main body — larger teardrop shape
-        body = pygame.Rect(bx - 40, by - 10, 86, 30)
-        pygame.draw.ellipse(screen, (134, 149, 158), body)
-        # Belly (lighter underside)
-        belly = pygame.Rect(bx - 30, by + 2, 66, 18)
-        pygame.draw.ellipse(screen, (180, 195, 200), belly)
-        # Body outline
-        pygame.draw.ellipse(screen, (90, 102, 110), body, width=2)
+        # Smooth depth transition (~1 second to fully dive/surface)
+        if self.shark_transition_speed > 0:
+            self.shark_depth = min(1.0, self.shark_depth + dt * 1.2)
+        elif self.shark_transition_speed < 0:
+            self.shark_depth = max(0.0, self.shark_depth - dt * 1.2)
+        # Stop transitioning when fully arrived
+        if self.shark_depth >= 1.0 or self.shark_depth <= 0.0:
+            self.shark_transition_speed = 0.0
 
-        # Dorsal fin (top, with sway)
-        fin_sway = math.sin(t * 7.0) * 4.0
-        fin = [
-            (int(bx + fin_sway), by - 32),
-            (bx - 10, by - 6),
-            (bx + 12, by - 8),
-        ]
-        pygame.draw.polygon(screen, (110, 125, 132), fin)
-        pygame.draw.polygon(screen, (85, 98, 105), fin, width=2)
+    def _shark_patrol_pos(self, t):
+        """Return (x, y, heading) on the shark's elliptical patrol path."""
+        # Elliptical patrol in open sea (left side, away from island)
+        cx, cy = 240, 380
+        rx, ry = 120, 55
+        # Add subtle wobble for organic feel
+        wobble_x = math.sin(t * 0.7) * 15
+        wobble_y = math.cos(t * 0.5) * 8
+        a = self.shark_angle
+        x = cx + math.cos(a) * rx + wobble_x
+        y = cy + math.sin(a) * ry + wobble_y
+        # Heading = tangent of ellipse
+        heading = math.atan2(math.cos(a) * ry, -math.sin(a) * rx)
+        return x, y, heading
 
-        # Pectoral fins (sides)
-        pec_fin = [
-            (bx + 8, by + 12),
-            (bx + 22, by + 24),
-            (bx + 18, by + 10),
-        ]
-        pygame.draw.polygon(screen, (115, 130, 138), pec_fin)
+    def _draw_shark(self, screen, t):
+        """Draw shark as fin-above-water or shadow-below-water."""
+        sx, sy, heading = self._shark_patrol_pos(t)
+        bx, by = int(sx), int(sy)
+        depth = self.shark_depth
 
-        # Snout / nose (front)
-        pygame.draw.ellipse(screen, (128, 142, 150), (bx + 32, by - 5, 22, 18))
+        # Clamp to sea area
+        sea = self.sea_rect
+        bx = max(sea.left + 30, min(sea.right - 30, bx))
+        by = max(sea.top + 30, min(sea.bottom - 60, by))
 
-        # Eye — expressive, slightly menacing but cartoonish
-        eye_x, eye_y = bx + 26, by - 2
-        pygame.draw.circle(screen, (240, 245, 240), (eye_x, eye_y), 7)
-        pygame.draw.circle(screen, (30, 30, 35), (eye_x + 2, eye_y), 4)
-        pygame.draw.circle(screen, WHITE, (eye_x + 3, eye_y - 2), 2)  # highlight
-        # Eyebrow (slightly angry look)
-        pygame.draw.line(screen, (70, 80, 88), (eye_x - 6, eye_y - 7), (eye_x + 4, eye_y - 5), 2)
+        # Heading direction for wake
+        dir_x = math.cos(heading)
+        dir_y = math.sin(heading)
 
-        # Mouth — animated jaw open/close
-        jaw_open = abs(math.sin(t * 3.0)) * 6
-        mouth_y = by + 6 + int(jaw_open * 0.3)
-        # Upper jaw line
-        pygame.draw.arc(screen, (60, 68, 75), (bx + 24, by + 1, 28, 12), 0.2, math.pi - 0.2, 2)
-        # Teeth (small triangles along jaw line)
-        for tx in range(bx + 28, bx + 48, 5):
-            pygame.draw.polygon(screen, (230, 230, 225), [
-                (tx, by + 6), (tx + 2, by + 10 + int(jaw_open * 0.2)), (tx + 4, by + 6)
-            ])
+        if depth < 0.85:
+            # --- DORSAL FIN (visible when near surface) ---
+            fin_visible = 1.0 - min(1.0, depth / 0.85)
+            fin_height = int(26 * fin_visible)
+            if fin_height > 2:
+                fin_sway = math.sin(t * 5.0) * 2.0 * fin_visible
+                # Fin points: tip, base-left, base-right
+                tip_x = bx + int(fin_sway)
+                tip_y = by - fin_height
+                fin_pts = [
+                    (tip_x, tip_y),
+                    (bx - 10, by),
+                    (bx + 12, by),
+                ]
+                pygame.draw.polygon(screen, (110, 125, 132), fin_pts)
+                pygame.draw.polygon(screen, (80, 95, 105), fin_pts, width=2)
+                # Highlight on fin
+                pygame.draw.line(screen, (140, 155, 165),
+                                 (tip_x + 1, tip_y + 4), (bx + 2, by - 2), 1)
 
-        # Water ripple / splash around shark
-        for i in range(3):
-            ripple_x = bx - 20 + i * 30
-            ripple_y = by + 16 + int(math.sin(t * 5.0 + i * 2.0) * 2)
-            pygame.draw.arc(screen, (170, 200, 210, 160),
-                            (ripple_x, ripple_y, 20, 8), 0, math.pi, 2)
+            # --- V-WAKE behind the fin ---
+            wake_alpha = fin_visible
+            if wake_alpha > 0.1:
+                for i in range(6):
+                    dist = 14 + i * 12
+                    spread = 2.0 + i * 2.5
+                    wx = bx - int(dir_x * dist)
+                    wy = by - int(dir_y * dist)
+                    perp_x = -dir_y
+                    perp_y = dir_x
+                    alpha = max(30, int(160 * wake_alpha) - i * 22)
+                    # Left wake line
+                    lx = wx + int(perp_x * spread)
+                    ly = wy + int(perp_y * spread)
+                    # Right wake line
+                    rx_w = wx - int(perp_x * spread)
+                    ry_w = wy - int(perp_y * spread)
+                    r = max(2, 5 - i)
+                    col = (180, 210, 220, alpha)
+                    ws = self._wake_surfs.get(r)
+                    if ws is None:
+                        ws = pygame.Surface((r * 4, r * 4), pygame.SRCALPHA)
+                        self._wake_surfs[r] = ws
+                    else:
+                        ws.fill((0, 0, 0, 0))
+                    pygame.draw.circle(ws, col, (r * 2, r * 2), r)
+                    screen.blit(ws, (lx - r * 2, ly - r * 2))
+                    screen.blit(ws, (rx_w - r * 2, ry_w - r * 2))
+
+            # --- WATER SPLASH at fin base ---
+            if fin_visible > 0.3:
+                for i in range(3):
+                    sp_x = bx - 8 + i * 8
+                    sp_y = by + int(math.sin(t * 6.0 + i * 1.5) * 2)
+                    pygame.draw.arc(screen, (185, 215, 225),
+                                    (sp_x, sp_y, 12, 5), 0, math.pi, 2)
+
+        if depth > 0.15:
+            # --- UNDERWATER SHADOW (dark oval drifting below surface) ---
+            shadow_alpha = min(1.0, (depth - 0.15) / 0.5)
+            shadow_w = int(64 * shadow_alpha)
+            shadow_h = int(18 * shadow_alpha)
+            if shadow_w > 4:
+                shadow_y = by + 8 + int(depth * 10)
+                shadow_surf = pygame.Surface((shadow_w + 4, shadow_h + 4), pygame.SRCALPHA)
+                alpha_val = int(55 * shadow_alpha)
+                pygame.draw.ellipse(shadow_surf, (40, 55, 70, alpha_val),
+                                    (2, 2, shadow_w, shadow_h))
+                screen.blit(shadow_surf, (bx - shadow_w // 2, shadow_y - shadow_h // 2))
+
+            # --- BUBBLES rising from submerged shark ---
+            if depth > 0.6:
+                bubble_phase = t * 3.0
+                for i in range(3):
+                    b_offset = (bubble_phase + i * 2.1) % 3.0
+                    if b_offset < 1.5:
+                        b_x = bx + int(math.sin(t * 2.0 + i * 1.7) * 12)
+                        b_y = by + 6 - int(b_offset * 18)
+                        b_r = max(1, 3 - int(b_offset))
+                        pygame.draw.circle(screen, (180, 210, 225), (b_x, b_y), b_r)
+                        pygame.draw.circle(screen, (200, 225, 238), (b_x, b_y), b_r, width=1)
+
+        # --- EXPANDING RIPPLES when transitioning ---
+        if 0.2 < depth < 0.8 and abs(self.shark_transition_speed) > 0:
+            ripple_progress = depth if self.shark_transition_speed > 0 else (1.0 - depth)
+            for i in range(3):
+                r_radius = int(8 + ripple_progress * 20 + i * 10)
+                r_alpha = max(30, int(120 * (1.0 - ripple_progress)) - i * 30)
+                pygame.draw.circle(screen, (170, 200, 215), (bx, by), r_radius, width=1)
 
     def handle_event(self, event):
         # Title phase: no interaction (dialogue handled by game)
@@ -733,6 +833,9 @@ class VoyageIntroScene(BaseScene):
         if self.presentation_phase == "title":
             return
 
+        # Shark always patrols (even during questions)
+        self._update_shark(dt)
+
         if self.flash_timer > 0:
             self.flash_timer -= dt
 
@@ -764,6 +867,7 @@ class VoyageIntroScene(BaseScene):
         if self.progress >= 1.0:
             self.disembark_ready = True
             self.status_line = "Land ho! You learned to guard your treasure. Well done, Captain!"
+            self.scroll_message(self.status_line, "success", important=True)
             self.game.audio.play_sfx("reward")
 
     def draw(self, screen):
@@ -789,7 +893,8 @@ class VoyageIntroScene(BaseScene):
             draw_text_outline(screen, "A Cybersecurity Adventure", self.game.fonts.small, CYAN, BLACK, (450, 320), center=True)
 
             # Virgil on the left
-            self.draw_scene_virgil(200, 460, "Protect your treasure, matey!", show_bubble=True)
+            self.draw_scene_virgil(200, 460)
+            self.scroll_message("Protect your treasure, matey!", "dialogue")
 
             # Draw captain portrait
             self.draw_character_portrait("captain", (700, 460), 90)
@@ -800,11 +905,9 @@ class VoyageIntroScene(BaseScene):
         self._draw_route(screen)
 
         ship_x, ship_y, heading = self._route_position(self.progress)
-        shark_x = ship_x - 60
-        shark_y = ship_y + 34 + math.sin(t * 4.4) * 5.0
 
+        self._draw_shark(screen, t)
         self._draw_ship_wake(screen, ship_x, ship_y, heading, t)
-        self._draw_shark(screen, shark_x, shark_y, t)
         self._draw_galleon(screen, (ship_x, ship_y), heading, t)
 
         # Compact header bar with title + progress
@@ -822,17 +925,7 @@ class VoyageIntroScene(BaseScene):
         pygame.draw.rect(screen, (90, 59, 32), (bar_x, bar_y, bar_w, bar_h), width=2, border_radius=6)
         draw_text_outline(screen, f"{progress_pct}%", self.game.fonts.tiny, (240, 220, 177), BLACK, (bar_x + bar_w + 30, bar_y + 4), center=True)
 
-        # Status line — only shown when NOT in a question (avoids duplicate)
-        if not self.awaiting_choice and self.status_line:
-            status_panel = pygame.Rect(60, 72, 780, 50)
-            draw_panel(screen, status_panel, bg_color=(86, 64, 46), border_color=(198, 159, 103))
-            for idx, line in enumerate(wrap_text(self.status_line, self.game.fonts.tiny, status_panel.width - 34)[:2]):
-                draw_text_outline(
-                    screen, line, self.game.fonts.tiny,
-                    (247, 226, 174), BLACK,
-                    (status_panel.centerx, status_panel.top + 12 + idx * 24),
-                    center=True,
-                )
+        # Status line now routed through the Ancient Pirate Scroll panel
 
         if not self.is_presentation:
             self.skip_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
@@ -938,6 +1031,10 @@ class LandingScene(BaseScene):
         self.quote_interval = 6.0
         self.quote_index = 0
 
+    def enter(self, payload=None):
+        self.completed = False
+        self.scroll_message(self.current_quote, "dialogue")
+
     def _sync_audio_settings(self):
         self.game.audio.set_music_volume(self.music_slider.value)
         self.game.audio.set_sfx_volume(self.sfx_slider.value)
@@ -1034,12 +1131,13 @@ class LandingScene(BaseScene):
         cfg = self.game.difficulty_manager.get_config(self.game.current_difficulty)
         self.diff_button.label = f"MODE: {cfg.label.upper()}"
 
-        # Cycle Virgil quotes
+        # Cycle Virgil quotes — push to scroll
         self.quote_timer += dt
         if self.quote_timer >= self.quote_interval:
             self.quote_timer = 0.0
             self.quote_index = (self.quote_index + 1) % len(self.virgil_quotes)
             self.current_quote = self.virgil_quotes[self.quote_index]
+            self.scroll_message(self.current_quote, "dialogue")
 
     def draw(self, screen):
         t = pygame.time.get_ticks() / 1000.0
@@ -1058,8 +1156,8 @@ class LandingScene(BaseScene):
             fallback=lambda s: draw_chest_fallback(s, self.chest_pos, t, open_amount=0.0, shake=0.0),
         )
 
-        # Virgil — the star character
-        self.draw_scene_virgil(self.parrot_pos[0], self.parrot_pos[1], self.current_quote, show_bubble=True)
+        # Virgil — the star character (text routed through scroll)
+        self.draw_scene_virgil(self.parrot_pos[0], self.parrot_pos[1])
 
         # Buttons in the left-center area
         self.play_button.rect = pygame.Rect(80, 290, 300, 96)
@@ -1156,6 +1254,7 @@ class CrackScene(BaseScene):
         self.revealed = [None for _ in range(self.config.length)]
         self.weak_meter = 0.0
         self.parrot_line = "Spin the dials and crack the lock, matey!"
+        self.scroll_message(self.parrot_line, "dialogue")
         self.parrot_emotion = "talk"
         self.chest_state = "closed"
         self.shake_timer = 0.0
@@ -1300,8 +1399,8 @@ class CrackScene(BaseScene):
 
         # Panel slides in from bottom
         panel_progress = self._ease(self.cinematic_zoom)
-        panel_y = int(560 + (54 - 560) * panel_progress)
-        panel = pygame.Rect(60, panel_y, 780, 492)
+        panel_y = int(560 + (30 - 560) * panel_progress)
+        panel = pygame.Rect(60, panel_y, 780, 530)
 
         # Outer wooden frame
         pygame.draw.rect(screen, (55, 32, 16), panel.inflate(16, 16), border_radius=32)
@@ -1336,7 +1435,7 @@ class CrackScene(BaseScene):
         )
 
         # Treasure items area
-        item_area = pygame.Rect(panel.left + 20, panel.top + 96, panel.width - 40, 240)
+        item_area = pygame.Rect(panel.left + 20, panel.top + 96, panel.width - 40, 180)
         pygame.draw.rect(screen, (50, 28, 14), item_area, border_radius=18)
         pygame.draw.rect(screen, (70, 42, 20), item_area.inflate(-6, -6), border_radius=16)
         pygame.draw.rect(screen, (110, 72, 32), item_area, width=2, border_radius=18)
@@ -1345,11 +1444,11 @@ class CrackScene(BaseScene):
         draw_funcs = [draw_golden_key, draw_ruby_shield, draw_emerald_scroll,
                       draw_diamond_crown, draw_captains_medal]
         item_positions = [
-            (item_area.left + 80, item_area.top + 50),    # Golden Key
-            (item_area.left + 80, item_area.top + 120),   # Ruby Shield
-            (item_area.left + 80, item_area.top + 190),   # Emerald Scroll
-            (item_area.left + 420, item_area.top + 50),   # Diamond Crown
-            (item_area.left + 420, item_area.top + 120),  # Captain's Medal
+            (item_area.left + 130, item_area.top + 45),   # Golden Key (row 1)
+            (item_area.left + 340, item_area.top + 45),   # Ruby Shield (row 1)
+            (item_area.left + 550, item_area.top + 45),   # Emerald Scroll (row 1)
+            (item_area.left + 220, item_area.top + 130),  # Diamond Crown (row 2)
+            (item_area.left + 440, item_area.top + 130),  # Captain's Medal (row 2)
         ]
 
         self.treasure_hotspots = []
@@ -1369,39 +1468,39 @@ class CrackScene(BaseScene):
             item_info = TREASURE_ITEMS[idx]
             name_color = GOLD if idx in self.treasure_items_tapped else WHITE
             draw_text_outline(screen, item_info["name"], self.game.fonts.tiny, name_color, BLACK,
-                              (px + 80, py - 6), center=False)
+                              (px, py + 30), center=True)
 
             # Checkmark if tapped
             if idx in self.treasure_items_tapped:
-                pygame.draw.circle(screen, GREEN, (px + 22, py + 22), 10)
+                pygame.draw.circle(screen, GREEN, (px + 22, py - 10), 10)
                 pygame.draw.polygon(screen, WHITE,
-                                    [(px + 16, py + 22), (px + 20, py + 27), (px + 28, py + 17)], width=2)
+                                    [(px + 16, py - 10), (px + 20, py - 5), (px + 28, py - 15)], width=2)
 
             # Lesson preview (short) if tapped
             if idx in self.treasure_items_tapped:
-                short_lesson = item_info["lesson"][:40]
-                if len(item_info["lesson"]) > 40:
+                short_lesson = item_info["lesson"][:30]
+                if len(item_info["lesson"]) > 30:
                     short_lesson += "..."
                 draw_text_outline(screen, short_lesson, self.game.fonts.tiny, (200, 200, 180), BLACK,
-                                  (px + 80, py + 18), center=False)
+                                  (px, py + 46), center=True)
 
             # Hitbox
-            hotspot = pygame.Rect(px - 30, py - 30, 320, 60)
+            hotspot = pygame.Rect(px - 60, py - 30, 120, 80)
             self.treasure_hotspots.append((hotspot, idx))
 
         # Active lesson text panel (shown when item recently tapped)
         if self.active_lesson_text and self.active_lesson_timer > 0:
-            lesson_rect = pygame.Rect(panel.left + 30, panel.top + 340, panel.width - 60, 56)
+            lesson_rect = pygame.Rect(panel.left + 30, panel.top + 290, panel.width - 60, 70)
             pygame.draw.rect(screen, (50, 28, 14), lesson_rect, border_radius=14)
             pygame.draw.rect(screen, (210, 165, 60), lesson_rect, width=2, border_radius=14)
             # Wrap text to fit
             lines = wrap_text(self.active_lesson_text, self.game.fonts.small, lesson_rect.width - 20)
-            for li, line in enumerate(lines[:2]):
+            for li, line in enumerate(lines[:3]):
                 draw_text_outline(screen, line, self.game.fonts.small, YELLOW, BLACK,
-                                  (lesson_rect.centerx, lesson_rect.top + 16 + li * 28), center=True)
+                                  (lesson_rect.centerx, lesson_rect.top + 18 + li * 22), center=True)
 
         # Coin row at bottom
-        coin_area = pygame.Rect(panel.left + 60, panel.top + 404, panel.width - 120, 50)
+        coin_area = pygame.Rect(panel.left + 60, panel.top + 370, panel.width - 120, 50)
         pygame.draw.rect(screen, (60, 35, 18), coin_area, border_radius=12)
         pygame.draw.rect(screen, (100, 65, 28), coin_area, width=1, border_radius=12)
 
@@ -1416,17 +1515,15 @@ class CrackScene(BaseScene):
             hotspot = pygame.Rect(cx - 18, int(cy + wobble) - 18, 36, 36)
             self.coin_hotspots.append(hotspot)
 
-        # Coins collected counter
-        if self.coins_collected > 0:
-            draw_text_outline(screen, f"Coins Collected: {self.coins_collected}", self.game.fonts.tiny,
-                              GOLD, BLACK, (panel.centerx, panel.top + 470), center=True)
-
-        # Treasure Master confetti celebration text
+        # Coins collected counter OR Treasure Master celebration text
         if self.treasure_master:
             pulse = abs(math.sin(t * 3))
             glow = (int(255 * 0.7 + 255 * 0.3 * pulse), int(220 * 0.7 + 35 * 0.3 * pulse), int(50 + 50 * pulse))
             draw_text_outline(screen, "TREASURE MASTER!", self.game.fonts.big, glow, BLACK,
-                              (panel.centerx, panel.top + 470), center=True)
+                              (panel.centerx, panel.top + 430), center=True)
+        elif self.coins_collected > 0:
+            draw_text_outline(screen, f"Coins Collected: {self.coins_collected}", self.game.fonts.tiny,
+                              GOLD, BLACK, (panel.centerx, panel.top + 430), center=True)
 
     def _resolve_success(self):
         self.win = True
@@ -1435,6 +1532,7 @@ class CrackScene(BaseScene):
         self.parrot_line = "SQUAWK! You cracked it! See how easy that was?"
         self.game.virgil.cheer()
         self.game.virgil.talk("SQUAWK! You cracked it! That lock was too weak!", duration_seconds=4.0)
+        self.scroll_message("SQUAWK! You cracked it! That lock was too weak!", "success", important=True)
         self.cinematic_timer = 0.0
         self.cinematic_open_amount = 0.0
         self.cinematic_zoom = 0.0
@@ -1469,6 +1567,7 @@ class CrackScene(BaseScene):
         self.parrot_emotion = "angry"
         self.game.virgil.laugh()
         self.game.virgil.talk(line, duration_seconds=3.0)
+        self.scroll_message(line, "warning")
         self.chest_state = "shake"
         self.shake_timer = 0.38
         self.screen_shake_timer = 0.25
@@ -1480,6 +1579,7 @@ class CrackScene(BaseScene):
             self.parrot_line = "No more hints, captain! Virgil spilled 'em all!"
             self.parrot_emotion = "surprised"
             self.game.virgil.surprise()
+            self.scroll_message(self.parrot_line, "hint")
             return
         idx = random.choice(hidden)
         self.revealed[idx] = self.secret[idx]
@@ -1488,6 +1588,7 @@ class CrackScene(BaseScene):
         self.parrot_line = hint_text
         self.parrot_emotion = "talk"
         self.game.virgil.talk(hint_text, duration_seconds=2.5)
+        self.scroll_message(hint_text, "hint")
         self.virgil_quote_timer = 0.0
         self.virgil_next_quote_delay = random.uniform(6.0, 10.0)
         self.game.audio.play_sfx("click")
@@ -1515,6 +1616,7 @@ class CrackScene(BaseScene):
                             self.active_lesson_text = TREASURE_ITEMS[item_idx]["lesson"]
                             self.active_lesson_timer = 4.0
                             self.game.virgil.talk(self.active_lesson_text, duration_seconds=3.5)
+                            self.scroll_message(self.active_lesson_text, "teaching", important=True)
                             self._spawn_coin_clink_fx(pos[0], pos[1])
                             self.game.audio.play_sfx("click")
                             if len(self.treasure_items_tapped) >= 5 and not self.treasure_master:
@@ -1522,6 +1624,7 @@ class CrackScene(BaseScene):
                                 self._spawn_win_particles()
                                 self.game.audio.play_sfx("confetti")
                                 self.parrot_line = "TREASURE MASTER! You learned all the secrets!"
+                                self.scroll_message(self.parrot_line, "success", important=True)
                         else:
                             # Already tapped — just show the lesson again
                             self.active_lesson_text = TREASURE_ITEMS[item_idx]["lesson"]
@@ -1608,6 +1711,7 @@ class CrackScene(BaseScene):
 
             if self.cinematic_zoom > 0.7 and not self.treasure_master and self.parrot_line != "Tap each treasure to learn its secret! SQUAWK!":
                 self.parrot_line = "Tap each treasure to learn its secret! SQUAWK!"
+                self.scroll_message(self.parrot_line, "dialogue")
 
             # Update treasure vault timers
             if self.active_lesson_timer > 0:
@@ -1626,6 +1730,7 @@ class CrackScene(BaseScene):
                 self.parrot_emotion = random.choice(["talk", "surprised"])
                 self.virgil_quote_timer = 0.0
                 self.virgil_next_quote_delay = random.uniform(6.0, 12.0)
+                self.scroll_message(self.parrot_line, "teaching")
 
             # Proactive hints in presentation mode after some time
             if self.is_presentation and not self.win:
@@ -1636,6 +1741,7 @@ class CrackScene(BaseScene):
                         self.parrot_line = "Need help? Click me for a hint! SQUAWK!"
                         self.parrot_emotion = "talk"
                         self.proactive_hint_timer = 0.0
+                        self.scroll_message(self.parrot_line, "hint")
 
         # Set completed after win cinematic finishes
         if self.win and self.cinematic_zoom >= 0.95:
@@ -1674,19 +1780,19 @@ class CrackScene(BaseScene):
             )
 
         virgil_x, virgil_y = ((790, 454) if self.win else self.virgil_pos)
-        self.draw_scene_virgil(virgil_x, virgil_y, self.parrot_line, show_bubble=not self.win)
+        self.draw_scene_virgil(virgil_x, virgil_y)
 
-        # Clickable hint label — positioned below the tries panel
+        # Clickable hint label — positioned right below the tries panel, near Virgil
         if not self.win:
             draw_text_outline(screen, "(click for hint)", self.game.fonts.tiny, (200, 200, 150), BLACK,
-                              (virgil_x, 320), center=True)
+                              (virgil_x, 200), center=True)
 
-        # Title + difficulty (above chest, clear area)
+        # Title + difficulty (left side, higher — clear of Virgil's speech bubble on the right)
         title = "Chest Unlocked! Treasure Reveal" if self.win else f"Crack the {self.config.length}-char code!"
         title_color = YELLOW if self.win else ORANGE
-        draw_text_outline(screen, title, self.game.fonts.big, title_color, BLACK, (380, 198), center=True)
+        draw_text_outline(screen, title, self.game.fonts.big, title_color, BLACK, (280, 178), center=True)
         diff_line = "Legendary Reward Sequence" if self.win else f"Difficulty: {self.config.label}"
-        draw_text_outline(screen, diff_line, self.game.fonts.small, CYAN, BLACK, (380, 266), center=True)
+        draw_text_outline(screen, diff_line, self.game.fonts.small, CYAN, BLACK, (280, 226), center=True)
 
         if not self.win:
             for dial in self.dials:
@@ -1703,23 +1809,24 @@ class CrackScene(BaseScene):
                 # Show Nina cheering on success
                 self.draw_character_portrait("nina", (80, 540), 60)
 
-        tries_rect = pygame.Rect(666, 250, 212, 60)
+        tries_rect = pygame.Rect(680, 190, 200, 50)
         if not self.win:
             draw_panel(screen, tries_rect, bg_color=(36, 64, 112), border_color=(188, 214, 255))
             draw_text_outline(screen, f"Tries: {self.attempts}", self.game.fonts.small, YELLOW, BLACK, tries_rect.center, center=True)
 
             hint_text = " ".join(v if v is not None else "?" for v in self.revealed)
-            draw_text_outline(screen, f"Hints: {hint_text}", self.game.fonts.tiny, WHITE, BLACK, (450, 496), center=True)
+            draw_text_outline(screen, f"Hints: {hint_text}", self.game.fonts.tiny, WHITE, BLACK, (450, 480), center=True)
 
             # Weak meter
-            x, y, w, h = 300, 546, 300, 34
+            x, y, w, h = 300, 530, 300, 34
             pygame.draw.rect(screen, (238, 224, 203), (x - 5, y - 5, w + 10, h + 10), border_radius=12)
             pygame.draw.rect(screen, BLACK, (x - 5, y - 5, w + 10, h + 10), width=3, border_radius=12)
             pygame.draw.rect(screen, (120, 50, 50), (x, y, w, h), border_radius=10)
             fill = int(w * self.weak_meter)
             if fill > 0:
                 pygame.draw.rect(screen, RED, (x, y, fill, h), border_radius=10)
-            draw_text_outline(screen, "Weak Password Meter", self.game.fonts.tiny, YELLOW, BLACK, (450, y - 14), center=True)
+            # Label inside the meter bar instead of above it
+            draw_text_outline(screen, "Weak Password Meter", self.game.fonts.tiny, YELLOW, BLACK, (x + w // 2, y + h // 2 - 2), center=True)
 
         self.draw_particles(self.treasure)
         self.draw_particles(self.sparkles)
@@ -1729,11 +1836,12 @@ class CrackScene(BaseScene):
 class LessonScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self.to_builder_button = Button((90, 520, 340, 64), "BUILD PASSWORD", (84, 190, 96), (110, 214, 122), pulse=False)
-        self.play_again_button = Button((470, 520, 340, 64), "PLAY AGAIN", (255, 172, 50), (255, 196, 80), pulse=False)
+        self.to_builder_button = Button((90, 530, 340, 54), "BUILD PASSWORD", (84, 190, 96), (110, 214, 122), pulse=False)
+        self.play_again_button = Button((470, 530, 340, 54), "PLAY AGAIN", (255, 172, 50), (255, 196, 80), pulse=False)
 
     def enter(self, payload=None):
         self.completed = False
+        self.scroll_message("Remember the golden rules of password safety!", "teaching")
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -1755,20 +1863,15 @@ class LessonScene(BaseScene):
         panel = pygame.Rect(30, 30, 840, 560)
         draw_panel(screen, panel)
 
-        # Title
-        draw_text_outline(screen, "What We Learned!", self.game.fonts.med, RED, BLACK,
-                          (panel.centerx, panel.top + 38), center=True)
-
-        # Stars
+        # Title and stars on the same line
         result = self.game.last_round_result or {}
         stars = result.get("stars_awarded", 0)
+        title_str = "What We Learned!"
         if stars > 0:
-            # Draw star icons
-            star_text = ""
-            for _ in range(stars):
-                star_text += "* "
-            draw_text_outline(screen, f"Stars: {star_text.strip()}", self.game.fonts.small,
-                              YELLOW, BLACK, (panel.centerx, panel.top + 78), center=True)
+            star_text = " ".join("*" for _ in range(stars))
+            title_str += f"  Stars: {star_text}"
+        draw_text_outline(screen, title_str, self.game.fonts.small, RED, BLACK,
+                          (panel.centerx, panel.top + 32), center=True)
 
         # Lesson cards — each is a small panel with portrait + text
         lessons = [
@@ -1781,11 +1884,12 @@ class LessonScene(BaseScene):
 
         card_x = panel.left + 18
         card_w = panel.width - 36
-        card_h = 56
-        y_start = panel.top + 108
+        card_h = 48
+        card_gap = 6
+        y_start = panel.top + 60
 
         for idx, (char_id, text, card_tint) in enumerate(lessons):
-            cy = y_start + idx * (card_h + 8)
+            cy = y_start + idx * (card_h + card_gap)
 
             # Card background
             card_rect = pygame.Rect(card_x, cy, card_w, card_h)
@@ -1793,13 +1897,13 @@ class LessonScene(BaseScene):
             pygame.draw.rect(screen, (40, 30, 20), card_rect, width=2, border_radius=14)
 
             # Portrait on left
-            portrait_cx = card_x + 32
+            portrait_cx = card_x + 28
             portrait_cy = cy + card_h // 2
-            self.draw_character_portrait(char_id, (portrait_cx, portrait_cy), 38)
+            self.draw_character_portrait(char_id, (portrait_cx, portrait_cy), 30)
 
             # Text — use tiny font and wrap within card width
-            text_x = card_x + 60
-            text_max_w = card_w - 80
+            text_x = card_x + 52
+            text_max_w = card_w - 70
             lines = wrap_text(text, self.game.fonts.tiny, text_max_w)
             if len(lines) == 1:
                 draw_text_outline(screen, lines[0], self.game.fonts.tiny, WHITE, BLACK,
@@ -1807,10 +1911,10 @@ class LessonScene(BaseScene):
             else:
                 for li, line in enumerate(lines[:2]):
                     draw_text_outline(screen, line, self.game.fonts.tiny, WHITE, BLACK,
-                                      (text_x, cy + 14 + li * 24), center=False)
+                                      (text_x, cy + 12 + li * 20), center=False)
 
         # Example password
-        example_y = y_start + len(lessons) * (card_h + 8) + 10
+        example_y = y_start + len(lessons) * (card_h + card_gap) + 12
         draw_text_outline(screen, "Strong example:", self.game.fonts.tiny, BLACK, YELLOW,
                           (panel.centerx - 60, example_y), center=True)
         draw_text_outline(screen, "C@pt@in$tar42!", self.game.fonts.small, DARK_BLUE, BLACK,
@@ -1850,6 +1954,7 @@ class BuilderScene(BaseScene):
         self.strength = 0
         self.parrot_line = "Mix letters, numbers and symbols for a treasure-proof password!"
         self.parrot_emotion = "talk"
+        self.scroll_message(self.parrot_line, "dialogue")
         self.confetti.clear()
         self.sparkles.clear()
         self.confetti_done = False
@@ -1907,6 +2012,7 @@ class BuilderScene(BaseScene):
         if len(self.password) >= 24:
             self.parrot_line = "That is already a mega-password!"
             self.parrot_emotion = "cheer"
+            self.scroll_message(self.parrot_line, "success")
             return
 
         if kind == "letter":
@@ -1927,6 +2033,7 @@ class BuilderScene(BaseScene):
             self.parrot_emotion = "cheer"
             virgil.cheer()
             virgil.talk(self.parrot_line, duration_seconds=4.0)
+            self.scroll_message(self.parrot_line, "success", important=True)
             self._spawn_confetti()
             self.game.audio.play_sfx("confetti")
             self.game.audio.play_sfx("reward")
@@ -1937,18 +2044,21 @@ class BuilderScene(BaseScene):
             self.parrot_emotion = "cheer"
             virgil.cheer()
             virgil.talk(self.parrot_line, duration_seconds=3.0)
+            self.scroll_message(self.parrot_line, "success")
             self.game.audio.play_sfx("click")
         elif self.strength >= 50 and 50 not in self.milestone_shown:
             self.milestone_shown.add(50)
             self.parrot_line = "Getting stronger! Add a symbol or I'll walk the plank!"
             self.parrot_emotion = "talk"
             virgil.talk(self.parrot_line, duration_seconds=3.0)
+            self.scroll_message(self.parrot_line, "teaching")
             self.game.audio.play_sfx("click")
         elif self.strength >= 25 and 25 not in self.milestone_shown:
             self.milestone_shown.add(25)
             self.parrot_line = "That's getting stronger, matey! Keep building!"
             self.parrot_emotion = "talk"
             virgil.talk(self.parrot_line, duration_seconds=2.5)
+            self.scroll_message(self.parrot_line, "teaching")
             self.game.audio.play_sfx("click")
         else:
             tips = [
@@ -1957,6 +2067,7 @@ class BuilderScene(BaseScene):
                 "Longer passwords protect your treasure even better!",
             ]
             self.parrot_line = random.choice(tips)
+            self.scroll_message(self.parrot_line, "dialogue")
             self.parrot_emotion = "talk"
             self.game.audio.play_sfx("click")
 
@@ -1983,6 +2094,7 @@ class BuilderScene(BaseScene):
                 self.strength = self._calculate_strength(self.password)
                 self.parrot_line = "Trimmed one!"
                 self.parrot_emotion = "surprised"
+                self.scroll_message(self.parrot_line, "dialogue")
                 self.game.audio.play_sfx("click")
                 return
             if self.clear_button.clicked(pos):
@@ -1991,6 +2103,7 @@ class BuilderScene(BaseScene):
                 self.confetti_done = False
                 self.parrot_line = "Fresh start, captain!"
                 self.parrot_emotion = "talk"
+                self.scroll_message(self.parrot_line, "dialogue")
                 self.game.audio.play_sfx("click")
                 return
             if self.finish_button.clicked(pos):
@@ -2021,7 +2134,7 @@ class BuilderScene(BaseScene):
         )
 
         # Virgil on the right
-        self.draw_scene_virgil(790, 500, self.parrot_line, show_bubble=True)
+        self.draw_scene_virgil(790, 500)
 
         # Password display box
         box = pygame.Rect(80, 182, 740, 68)
@@ -2177,6 +2290,7 @@ class FinaleScene(BaseScene):
         self.confetti.clear()
         self.sparkles.clear()
         self.spawn_timer = 0.0
+        self.scroll_message("YOUR PASSWORD IS YOUR TREASURE! Stay safe, brave pirates!", "success", important=True)
         self._spawn_confetti()
         self.game.audio.play_sfx("confetti")
         self.game.audio.play_sfx("reward")
@@ -2221,7 +2335,7 @@ class FinaleScene(BaseScene):
 
         # Big finale title with gentle pulse
         title_scale = 1.0 + 0.03 * math.sin(t * 2)
-        draw_text_outline(screen, "You Did It, Brave Pirates!", self.game.fonts.huge, YELLOW, BLACK, (450, 100), center=True)
+        draw_text_outline(screen, "You Did It, Brave Pirates!", self.game.fonts.big, YELLOW, BLACK, (450, 70), center=True)
 
         # Golden rule — pulsing glow
         pulse = abs(math.sin(t * 2.5))
@@ -2230,12 +2344,7 @@ class FinaleScene(BaseScene):
             int(220 * 0.7 + 35 * 0.3 * pulse),
             int(50 + 50 * pulse),
         )
-        # Draw golden glow behind text
-        glow_rect = pygame.Rect(100, 156, 700, 50)
-        glow_surf = pygame.Surface((glow_rect.width, glow_rect.height), pygame.SRCALPHA)
-        glow_surf.fill((*glow_color, int(60 * pulse)))
-        screen.blit(glow_surf, glow_rect.topleft)
-        draw_text_outline(screen, "YOUR PASSWORD IS YOUR TREASURE!", self.game.fonts.med, glow_color, BLACK, (450, 180), center=True)
+        draw_text_outline(screen, "YOUR PASSWORD IS YOUR TREASURE!", self.game.fonts.small, glow_color, BLACK, (450, 130), center=True)
 
         # Character lineup
         chars = [
@@ -2247,12 +2356,12 @@ class FinaleScene(BaseScene):
 
         for char_id, x in chars:
             if char_id == "virgil":
-                self.draw_scene_virgil(x, 330, "We did it!", show_bubble=False)
+                self.draw_scene_virgil(x, 280, "We did it!", show_bubble=False)
             else:
-                self.draw_character_portrait(char_id, (x, 330), 100)
+                self.draw_character_portrait(char_id, (x, 280), 80)
                 from .dialogue import CHARACTERS
                 name = CHARACTERS.get(char_id, {}).get("name", char_id)
-                draw_text_outline(screen, name, self.game.fonts.tiny, WHITE, BLACK, (x, 400), center=True)
+                draw_text_outline(screen, name, self.game.fonts.tiny, WHITE, BLACK, (x, 340), center=True)
 
         # Key takeaways
         tips = [
@@ -2260,13 +2369,13 @@ class FinaleScene(BaseScene):
             "Keep personal info PRIVATE: name, address, birthday",
             "Only share passwords with trusted grown-ups",
         ]
-        y = 460
+        y = 390
         for tip in tips:
             draw_text_outline(screen, tip, self.game.fonts.tiny, YELLOW, BLACK, (450, y), center=True)
-            y += 30
+            y += 28
 
         # Farewell
-        draw_text_outline(screen, "Stay safe on the seven seas of the internet!", self.game.fonts.small, CYAN, BLACK, (450, 560), center=True)
+        draw_text_outline(screen, "Stay safe on the seven seas of the internet!", self.game.fonts.small, CYAN, BLACK, (450, 500), center=True)
 
         self.draw_particles(self.confetti)
         self.draw_particles(self.sparkles)

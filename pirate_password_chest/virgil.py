@@ -60,10 +60,13 @@ class _Particle:
 BODY_RED = (210, 48, 38)
 BODY_RED_LIGHT = (235, 85, 65)
 BODY_RED_DARK = (165, 32, 26)
-BELLY_CREAM = (255, 230, 185)
-BELLY_OUTLINE = (210, 180, 130)
+BELLY_CREAM = (255, 200, 100)
+BELLY_OUTLINE = (210, 160, 70)
+BODY_ORANGE = (255, 165, 60)
 
 # Wing plumage
+WING_RED = (210, 48, 38)
+WING_ORANGE = (255, 180, 40)
 WING_GREEN = (32, 162, 75)
 WING_GREEN_LIGHT = (60, 195, 105)
 WING_GREEN_DARK = (22, 120, 55)
@@ -80,11 +83,14 @@ TAIL_YELLOW = (250, 210, 50)
 HEAD_RED = (220, 55, 40)
 HEAD_LIGHT = (240, 100, 80)
 CHEEK_WHITE = (255, 250, 240)
+HEAD_GREEN_TUFT = (45, 180, 75)
 
-# Beak
-BEAK_DARK = (30, 30, 32)
-BEAK_GRAY = (55, 52, 50)
-BEAK_HIGHLIGHT = (80, 75, 72)
+# Beak (blue macaw beak)
+BEAK_DARK = (20, 60, 140)
+BEAK_GRAY = (40, 100, 190)
+BEAK_HIGHLIGHT = (80, 160, 250)
+BEAK_BLUE = (50, 120, 220)
+BEAK_BLUE_LIGHT = (80, 160, 250)
 
 # Eye
 EYE_WHITE = (255, 255, 252)
@@ -197,20 +203,29 @@ class Virgil:
         self.visible = True
 
     def _build_wing_surface(self) -> pygame.Surface:
-        wing_surface = pygame.Surface((40, 80), pygame.SRCALPHA)
-        pygame.draw.ellipse(wing_surface, WING_GREEN, (4, 0, 32, 65))
-        pygame.draw.ellipse(wing_surface, WING_GREEN_LIGHT, (8, 4, 24, 45))
-        pygame.draw.ellipse(wing_surface, WING_TIP_BLUE, (6, 48, 28, 16))
-        pygame.draw.ellipse(wing_surface, WING_TIP_YELLOW, (8, 58, 24, 14))
-        for fi in range(3):
-            fy = 14 + fi * 16
-            pygame.draw.line(wing_surface, WING_GREEN_DARK, (10, fy), (30, fy + 2), 1)
-        pygame.draw.ellipse(wing_surface, WING_GREEN_DARK, (4, 0, 32, 65), width=2)
+        wing_surface = pygame.Surface((45, 85), pygame.SRCALPHA)
+        # Top section: RED (shoulder area)
+        pygame.draw.ellipse(wing_surface, WING_RED, (5, 0, 35, 30))
+        # Upper-middle section: ORANGE/YELLOW
+        pygame.draw.ellipse(wing_surface, WING_ORANGE, (5, 18, 35, 28))
+        # Lower section: GREEN
+        pygame.draw.ellipse(wing_surface, WING_GREEN, (5, 38, 35, 26))
+        pygame.draw.ellipse(wing_surface, WING_GREEN_LIGHT, (9, 42, 27, 18))
+        # Tip section: BLUE
+        pygame.draw.ellipse(wing_surface, WING_TIP_BLUE, (7, 56, 31, 18))
+        pygame.draw.ellipse(wing_surface, WING_TIP_YELLOW, (9, 66, 27, 14))
+        # Feather line details
+        for fi in range(4):
+            fy = 12 + fi * 16
+            pygame.draw.line(wing_surface, WING_GREEN_DARK, (11, fy), (33, fy + 2), 1)
+        # Overall wing outline
+        pygame.draw.ellipse(wing_surface, BODY_RED_DARK, (5, 0, 35, 70), width=2)
         return wing_surface
 
     # === PUBLIC API ===
 
-    def talk(self, text: str, duration_seconds: float = 3.0) -> None:
+    def talk(self, text: str, duration_seconds: float = 3.0,
+             show_bubble: bool = False) -> None:
         self._speech_text = text
         self._speech_display = ""
         self._speech_char_index = 0
@@ -218,7 +233,7 @@ class Virgil:
         self._speech_timer = 0.0
         self._speech_duration = duration_seconds
         self._speech_active = True
-        self._speech_show_bubble = True
+        self._speech_show_bubble = show_bubble
         self._set_state(STATE_TALKING)
 
     def laugh(self) -> None:
@@ -249,7 +264,7 @@ class Virgil:
         self.target_x = x
         self.target_y = y
 
-    def set_idle_text(self, text: str, show_bubble: bool = True) -> None:
+    def set_idle_text(self, text: str, show_bubble: bool = False) -> None:
         """Set text to show without changing state to talking."""
         if self.state == STATE_TALKING and text == self._speech_text:
             return
@@ -468,18 +483,18 @@ class Virgil:
     # --- Tail feathers (fan downward behind body) ---
     def _draw_tail(self, surface: pygame.Surface, x: int, y: int, t: float) -> None:
         wag = math.sin(t * 3.5) * 4
-        colors = [TAIL_RED, TAIL_BLUE, TAIL_GREEN, TAIL_YELLOW, TAIL_RED]
+        colors = [TAIL_RED, TAIL_GREEN, TAIL_BLUE, TAIL_GREEN, TAIL_RED]
         base_y = y + 40
         for i, col in enumerate(colors):
             angle = 1.2 + (i - 2) * 0.18 + math.sin(t * 2.8 + i * 0.7) * 0.05
             tx = x - 10 + i * 5 + int(wag * 0.15)
-            length = 50 - abs(i - 2) * 6
+            length = 65 - abs(i - 2) * 8
             ex = tx + int(math.cos(angle) * length)
             ey = base_y + int(math.sin(angle) * length)
-            w = max(2, 6 - abs(i - 2))
+            w = max(3, 8 - abs(i - 2))
             pygame.draw.line(surface, col, (tx, base_y), (ex, ey), w)
             # Rounded feather tip
-            pygame.draw.ellipse(surface, col, (ex - w, ey - 2, w * 2, 6))
+            pygame.draw.ellipse(surface, col, (ex - w, ey - 2, w * 2, 8))
 
     # --- Feet ---
     def _draw_feet(self, surface: pygame.Surface, x: int, y: int) -> None:
@@ -498,21 +513,24 @@ class Virgil:
     # --- Body (smaller, egg-shaped, below the big head) ---
     def _draw_body(self, surface: pygame.Surface, x: int, y: int, breath: float) -> None:
         b = int(breath)
-        # Main red body — egg shape
-        bw, bh = 56, 62
+        # Main red body — egg shape (wider and chubbier)
+        bw, bh = 62, 62
         body_rect = (x - bw // 2, y + b, bw, bh)
         pygame.draw.ellipse(surface, BODY_RED, body_rect)
         # Lighter front
-        fw, fh = 38, 42
+        fw, fh = 42, 44
         pygame.draw.ellipse(surface, BODY_RED_LIGHT, (x - fw // 2, y + 8 + b, fw, fh))
-        # Cream belly
+        # Orange band between red and belly
+        ow, oh = 34, 20
+        pygame.draw.ellipse(surface, BODY_ORANGE, (x - ow // 2, y + 12 + b, ow, oh))
+        # Cream/orange belly
         cw, ch = 28, 30
-        pygame.draw.ellipse(surface, BELLY_CREAM, (x - cw // 2, y + 14 + b, cw, ch))
-        pygame.draw.ellipse(surface, BELLY_OUTLINE, (x - cw // 2, y + 14 + b, cw, ch), width=1)
+        pygame.draw.ellipse(surface, BELLY_CREAM, (x - cw // 2, y + 16 + b, cw, ch))
+        pygame.draw.ellipse(surface, BELLY_OUTLINE, (x - cw // 2, y + 16 + b, cw, ch), width=1)
         # Feather arcs
         for fy in range(10, 52, 14):
             pygame.draw.arc(surface, BODY_RED_DARK,
-                            (x - 20, y + fy + b, 40, 8), 0.3, math.pi - 0.3, 1)
+                            (x - 22, y + fy + b, 44, 8), 0.3, math.pi - 0.3, 1)
         # Outline
         pygame.draw.ellipse(surface, BODY_RED_DARK, body_rect, width=2)
 
@@ -535,8 +553,8 @@ class Virgil:
 
         # After rotation, we need to offset so the shoulder stays in place
         rw, rh = rotated.get_size()
-        # The pivot was at (20, 0) in the original surface
-        pivot_in_orig = (20 if side == 1 else 20, 0)
+        # The pivot was at (22, 0) in the original 45-wide surface
+        pivot_in_orig = (22 if side == 1 else 22, 0)
         # After rotation, find where that pivot ended up
         cos_a = math.cos(math.radians(-rot_angle))
         sin_a = math.sin(math.radians(-rot_angle))
@@ -565,16 +583,25 @@ class Virgil:
         head_surf.fill((0, 0, 0, 0))
         cx, cy = HS // 2, HS // 2 + 10  # center of face within head surface
 
-        # --- Main head shape ---
-        head_r = 36
+        # --- Main head shape (larger for cuter proportions) ---
+        head_r = 40
         pygame.draw.circle(head_surf, HEAD_RED, (cx, cy), head_r)
         # Highlight on forehead
-        pygame.draw.circle(head_surf, HEAD_LIGHT, (cx - 6, cy - 14), 18)
+        pygame.draw.circle(head_surf, HEAD_LIGHT, (cx - 6, cy - 16), 20)
         # White cheek patch (macaw bare skin area — left cheek)
-        pygame.draw.ellipse(head_surf, CHEEK_WHITE, (cx - 32, cy + 4, 24, 18))
-        pygame.draw.ellipse(head_surf, (225, 218, 210), (cx - 32, cy + 4, 24, 18), width=1)
+        pygame.draw.ellipse(head_surf, CHEEK_WHITE, (cx - 36, cy + 4, 26, 20))
+        pygame.draw.ellipse(head_surf, (225, 218, 210), (cx - 36, cy + 4, 26, 20), width=1)
         # Head outline
         pygame.draw.circle(head_surf, BODY_RED_DARK, (cx, cy), head_r, width=2)
+        # Green feather tufts at top of head
+        for tuft_i, tuft_off in enumerate([-8, 0, 8]):
+            tuft_x = cx + tuft_off
+            tuft_y_base = cy - head_r + 2
+            tuft_y_tip = tuft_y_base - 10 - tuft_i % 2 * 4
+            pygame.draw.line(head_surf, HEAD_GREEN_TUFT,
+                             (tuft_x, tuft_y_base), (tuft_x + tuft_off // 3, tuft_y_tip), 3)
+            pygame.draw.circle(head_surf, HEAD_GREEN_TUFT,
+                               (tuft_x + tuft_off // 3, tuft_y_tip), 3)
 
         # --- Left eye (visible, BIG and expressive) ---
         ex_l, ey_l = cx - 12, cy - 4
@@ -607,33 +634,37 @@ class Virgil:
             pygame.draw.circle(head_surf, EYEPATCH_BLACK, (ex_r + sx_off, ey_r - 2), 1)
         pygame.draw.line(head_surf, (190, 185, 175), (ex_r - 3, ey_r + 2), (ex_r + 3, ey_r + 2), 1)
 
-        # --- Beak (large, bright yellow-orange, VISIBLE) ---
+        # --- Beak (large, bright BLUE macaw beak) ---
         beak_open = int(self._beak_open * 10)
-        bk_x = cx + 20  # beak starts right of center
+        bk_x = cx + 22  # beak starts right of center
         bk_y = cy + 4
-        # Upper beak (large, curved, bright)
-        upper = [(bk_x, bk_y - 4), (bk_x + 30, bk_y + 2),
-                 (bk_x + 26, bk_y + 10), (bk_x, bk_y + 6)]
-        pygame.draw.polygon(head_surf, (250, 200, 50), upper)
-        pygame.draw.polygon(head_surf, (200, 150, 30), upper, width=2)
+        # Upper beak (large, curved, bright blue)
+        upper = [(bk_x, bk_y - 5), (bk_x + 36, bk_y + 2),
+                 (bk_x + 32, bk_y + 12), (bk_x, bk_y + 7)]
+        pygame.draw.polygon(head_surf, BEAK_BLUE, upper)
+        # Highlight on upper beak
+        highlight = [(bk_x + 2, bk_y - 3), (bk_x + 28, bk_y + 1),
+                     (bk_x + 24, bk_y + 6), (bk_x + 2, bk_y + 3)]
+        pygame.draw.polygon(head_surf, BEAK_BLUE_LIGHT, highlight)
+        pygame.draw.polygon(head_surf, BEAK_DARK, upper, width=2)
         # Hook curve at tip
-        pygame.draw.arc(head_surf, (200, 150, 30), (bk_x + 20, bk_y, 14, 14), -0.6, 1.2, 2)
+        pygame.draw.arc(head_surf, BEAK_DARK, (bk_x + 26, bk_y, 14, 14), -0.6, 1.2, 2)
         # Nostril
-        pygame.draw.circle(head_surf, (180, 130, 25), (bk_x + 12, bk_y + 1), 2)
-        # Lower beak
-        lower = [(bk_x, bk_y + 8 + beak_open),
-                 (bk_x + 22, bk_y + 12 + beak_open),
-                 (bk_x, bk_y + 14 + beak_open)]
-        pygame.draw.polygon(head_surf, (230, 180, 40), lower)
-        pygame.draw.polygon(head_surf, (180, 130, 25), lower, width=1)
+        pygame.draw.circle(head_surf, BEAK_DARK, (bk_x + 14, bk_y + 1), 2)
+        # Lower beak (slightly darker blue)
+        lower = [(bk_x, bk_y + 9 + beak_open),
+                 (bk_x + 26, bk_y + 13 + beak_open),
+                 (bk_x, bk_y + 15 + beak_open)]
+        pygame.draw.polygon(head_surf, BEAK_GRAY, lower)
+        pygame.draw.polygon(head_surf, BEAK_DARK, lower, width=1)
         # Mouth interior
         if self._beak_open > 0.15:
-            mouth = [(bk_x + 2, bk_y + 6), (bk_x + 20, bk_y + 10),
-                     (bk_x + 18, bk_y + 10 + beak_open), (bk_x + 2, bk_y + 8 + beak_open)]
+            mouth = [(bk_x + 2, bk_y + 7), (bk_x + 24, bk_y + 11),
+                     (bk_x + 22, bk_y + 11 + beak_open), (bk_x + 2, bk_y + 9 + beak_open)]
             pygame.draw.polygon(head_surf, (160, 55, 65), mouth)
             # Tongue
             pygame.draw.ellipse(head_surf, (200, 90, 100),
-                                (bk_x + 4, bk_y + 8 + beak_open // 2, 10, 5))
+                                (bk_x + 4, bk_y + 9 + beak_open // 2, 12, 5))
 
         # --- Earring (gold hoop on left side) ---
         ear_x, ear_y = cx - 30, cy + 16
