@@ -128,31 +128,31 @@ class BaseScene:
 class VoyageIntroScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self.map_rect = pygame.Rect(28, 54, 844, 520)
+        self.map_rect = pygame.Rect(28, 54, 844, 380)
         self.sea_rect = self.map_rect.inflate(-40, -46)
         self.route_points = [
-            (100, 488),
-            (170, 440),
-            (255, 402),
-            (360, 370),
-            (485, 352),
-            (610, 360),
-            (700, 396),
-            (742, 452),
-            (700, 510),
-            (610, 532),
-            (510, 530),
-            (450, 486),
-            (430, 424),
+            (100, 380),
+            (170, 345),
+            (255, 318),
+            (360, 295),
+            (485, 285),
+            (610, 290),
+            (700, 310),
+            (742, 345),
+            (700, 390),
+            (610, 405),
+            (510, 403),
+            (450, 375),
+            (430, 340),
         ]
         self.segment_lengths: list[float] = []
         self.total_route_length = 1.0
         self._rebuild_route_metrics()
 
         self.skip_button = Button((14, 10, 120, 44), "SKIP", (110, 76, 45), (130, 94, 58), pulse=False)
-        self.choice_a_button = Button((100, 480, 320, 82), "CHOICE A", (52, 140, 68), (72, 165, 88), pulse=False)
-        self.choice_b_button = Button((480, 480, 320, 82), "CHOICE B", (170, 68, 55), (195, 90, 72), pulse=False)
-        self.disembark_button = Button((240, 520, 420, 64), "DISEMBARK!", (176, 124, 60), (198, 145, 78))
+        self.choice_a_button = Button((100, 374, 320, 64), "CHOICE A", (52, 140, 68), (72, 165, 88), pulse=False)
+        self.choice_b_button = Button((480, 374, 320, 64), "CHOICE B", (170, 68, 55), (195, 90, 72), pulse=False)
+        self.disembark_button = Button((240, 380, 420, 58), "DISEMBARK!", (176, 124, 60), (198, 145, 78))
 
         self.questions = [
             {
@@ -368,17 +368,17 @@ class VoyageIntroScene(BaseScene):
         pygame.draw.rect(cache, (162, 118, 71), frame.inflate(-8, -8), width=2, border_radius=22)
 
         # Island (static parts only — palm sway is animated separately)
-        island = pygame.Rect(360, 184, 332, 256)
+        island = pygame.Rect(360, 150, 332, 190)
         pygame.draw.ellipse(cache, (96, 126, 74), island)
-        pygame.draw.ellipse(cache, (74, 102, 56), island.inflate(-64, -52))
-        pygame.draw.ellipse(cache, (123, 96, 68), (450, 248, 140, 82))
-        pygame.draw.ellipse(cache, (99, 78, 56), (472, 232, 94, 56))
-        shore = pygame.Rect(388, 378, 274, 88)
+        pygame.draw.ellipse(cache, (74, 102, 56), island.inflate(-64, -40))
+        pygame.draw.ellipse(cache, (123, 96, 68), (450, 200, 140, 62))
+        pygame.draw.ellipse(cache, (99, 78, 56), (472, 190, 94, 42))
+        shore = pygame.Rect(388, 295, 274, 65)
         pygame.draw.ellipse(cache, (218, 186, 115), shore)
-        pygame.draw.ellipse(cache, (188, 156, 90), shore.inflate(-36, -22), width=4)
-        pygame.draw.polygon(cache, (80, 68, 60), [(505, 248), (536, 197), (568, 252)])
-        pygame.draw.polygon(cache, (67, 57, 49), [(539, 252), (577, 191), (613, 252)])
-        cove = pygame.Rect(477, 390, 98, 36)
+        pygame.draw.ellipse(cache, (188, 156, 90), shore.inflate(-36, -18), width=4)
+        pygame.draw.polygon(cache, (80, 68, 60), [(505, 200), (536, 162), (568, 204)])
+        pygame.draw.polygon(cache, (67, 57, 49), [(539, 204), (577, 158), (613, 204)])
+        cove = pygame.Rect(477, 305, 98, 28)
         pygame.draw.ellipse(cache, (94, 128, 141), cove)
         pygame.draw.arc(cache, (142, 170, 176), cove.inflate(12, 6), 0, math.pi, 2)
         land = self.route_points[-1]
@@ -425,8 +425,8 @@ class VoyageIntroScene(BaseScene):
         """Draw only the animated palm trees (sway). Static island parts are in the cache."""
         sway = math.sin(t * 2.7) * 4.0
         for base_x in (432, 530, 614):
-            top = (base_x + int(sway), 282)
-            pygame.draw.line(screen, (104, 72, 44), (base_x, 360), top, 10)
+            top = (base_x + int(sway), 222)
+            pygame.draw.line(screen, (104, 72, 44), (base_x, 280), top, 10)
             pygame.draw.circle(screen, (77, 120, 64), (top[0], top[1] - 10), 34)
             pygame.draw.circle(screen, (88, 136, 72), (top[0] + 20, top[1] - 2), 24)
 
@@ -669,8 +669,8 @@ class VoyageIntroScene(BaseScene):
     def _shark_patrol_pos(self, t):
         """Return (x, y, heading) on the shark's elliptical patrol path."""
         # Elliptical patrol in open sea (left side, away from island)
-        cx, cy = 240, 380
-        rx, ry = 120, 55
+        cx, cy = 240, 300
+        rx, ry = 100, 40
         # Add subtle wobble for organic feel
         wobble_x = math.sin(t * 0.7) * 15
         wobble_y = math.cos(t * 0.5) * 8
@@ -893,12 +893,12 @@ class VoyageIntroScene(BaseScene):
             draw_text_outline(screen, "A Cybersecurity Adventure", self.game.fonts.small, CYAN, BLACK, (450, 320), center=True)
 
             # Virgil on the left
-            self.draw_scene_virgil(200, 460)
+            self.draw_scene_virgil(200, 370)
             self.scroll_message("Protect your treasure, matey!", "dialogue")
 
             # Draw captain portrait
-            self.draw_character_portrait("captain", (700, 460), 90)
-            draw_text_outline(screen, "Captain", self.game.fonts.tiny, WHITE, BLACK, (700, 520), center=True)
+            self.draw_character_portrait("captain", (700, 370), 80)
+            draw_text_outline(screen, "Captain", self.game.fonts.tiny, WHITE, BLACK, (700, 420), center=True)
             return
 
         self._draw_chart_background(screen, t)
@@ -931,37 +931,24 @@ class VoyageIntroScene(BaseScene):
             self.skip_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
         if self.awaiting_choice and self.active_question is not None:
-            # Darken background
-            screen.blit(self.game._get_overlay_surface((28, 19, 13), 140), (0, 0))
+            # Question text is shown on the scroll panel — only draw choice
+            # buttons and a small character portrait above the scroll area.
 
-            # Question panel — full width, well-organized
-            q_panel = pygame.Rect(60, 80, 780, 390)
-            draw_panel(screen, q_panel, bg_color=(98, 71, 49), border_color=(204, 165, 108))
-
-            # Character portrait on the left
+            # Character portrait on the left, just above scroll
             char_id = self.active_character
             if char_id:
+                self.draw_character_portrait(char_id, (60, 400), 50)
                 from .dialogue import CHARACTERS
                 char_info = CHARACTERS.get(char_id, {})
                 char_name = char_info.get("name", "")
-                self.draw_character_portrait(char_id, (q_panel.left + 70, q_panel.top + 100), 90)
                 draw_text_outline(screen, char_name, self.game.fonts.tiny, YELLOW, BLACK,
-                                  (q_panel.left + 70, q_panel.top + 160), center=True)
+                                  (60, 432), center=True)
 
-            # "Crew Question" title
-            text_left = q_panel.left + 140 if char_id else q_panel.centerx
-            draw_text_outline(screen, "Crew Question!", self.game.fonts.med, (248, 216, 138), BLACK,
-                              (q_panel.centerx + 40, q_panel.top + 40), center=True)
-
-            # Question text — centered, large
-            q_lines = wrap_text(self.active_question["question"], self.game.fonts.small, q_panel.width - 180)
-            for idx, line in enumerate(q_lines[:3]):
-                draw_text_outline(
-                    screen, line, self.game.fonts.small,
-                    (255, 245, 220), BLACK,
-                    (q_panel.centerx + 40, q_panel.top + 110 + idx * 42),
-                    center=True,
-                )
+            # Choice buttons — compact, above the scroll panel
+            self.choice_a_button.rect = pygame.Rect(120, 374, 340, 64)
+            self.choice_b_button.rect = pygame.Rect(480, 374, 340, 64)
+            self.choice_a_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+            self.choice_b_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
             # Audience cue in presentation mode
             if self.is_presentation and self.active_question:
@@ -969,25 +956,14 @@ class VoyageIntroScene(BaseScene):
                 if self.question_cursor == 1:
                     cue = "POINT to A or B!"
                 draw_text_outline(screen, cue, self.game.fonts.small, YELLOW, BLACK,
-                                  (q_panel.centerx, q_panel.top + 260), center=True)
-
-            # Divider line before buttons
-            pygame.draw.line(screen, (204, 165, 108),
-                             (q_panel.left + 30, q_panel.top + 300),
-                             (q_panel.right - 30, q_panel.top + 300), 2)
-
-            # Choice buttons at bottom of panel
-            self.choice_a_button.rect = pygame.Rect(q_panel.left + 30, q_panel.top + 310, 340, 70)
-            self.choice_b_button.rect = pygame.Rect(q_panel.right - 370, q_panel.top + 310, 340, 70)
-            self.choice_a_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
-            self.choice_b_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+                                  (450, 350), center=True)
 
         elif self.disembark_ready:
             self.disembark_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
             draw_text_outline(screen, "Press Enter or click Disembark", self.game.fonts.tiny,
-                              (244, 222, 173), BLACK, (450, 500), center=True)
+                              (244, 222, 173), BLACK, (450, 430), center=True)
 
-        self.draw_scene_virgil(802, 520, "Stay sharp, matey!", show_bubble=False)
+        self.draw_scene_virgil(820, 380)
 
         # Correct/wrong answer flash overlay
         if self.flash_timer > 0 and self.flash_color:
@@ -998,23 +974,23 @@ class VoyageIntroScene(BaseScene):
 class LandingScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self.play_button = Button((300, 325, 300, 96), "PLAY", (255, 135, 40), (255, 170, 70))
-        self.diff_button = Button((300, 434, 300, 74), "MODE", (91, 163, 255), (117, 184, 255), pulse=False)
-        self.settings_button = Button((300, 518, 300, 58), "SETTINGS", (167, 121, 251), (188, 145, 255), pulse=False)
+        self.play_button = Button((300, 260, 300, 80), "PLAY", (255, 135, 40), (255, 170, 70))
+        self.diff_button = Button((300, 350, 300, 54), "MODE", (91, 163, 255), (117, 184, 255), pulse=False)
+        self.settings_button = Button((300, 410, 300, 36), "SETTINGS", (167, 121, 251), (188, 145, 255), pulse=False)
         self.mute_button = Button((0, 0, 220, 60), "MUTE: OFF", (215, 106, 80), (238, 128, 98), pulse=False)
         self.fullscreen_button = Button((0, 0, 220, 60), "FULL: OFF", (84, 145, 220), (105, 167, 240), pulse=False)
         self.settings_open = False
 
         self.music_slider = Slider((0, 0, 320, 28), "Music", initial=self.game.audio.music_volume)
         self.sfx_slider = Slider((0, 0, 320, 28), "SFX", initial=self.game.audio.sfx_volume)
-        self.settings_panel = pygame.Rect(210, 190, 480, 380)
+        self.settings_panel = pygame.Rect(210, 120, 480, 310)
 
         self.parent_rect = pygame.Rect(PARENT_HOTSPOT)
         self.parent_hold = 0.0
         self.parent_holding = False
 
-        self.parrot_pos = (760, 390)
-        self.chest_pos = (450, 380)
+        self.parrot_pos = (760, 320)
+        self.chest_pos = (450, 310)
 
         # Cycling Virgil quotes
         self.virgil_quotes = [
@@ -1047,10 +1023,10 @@ class LandingScene(BaseScene):
 
     def _layout_settings_controls(self):
         panel = self.settings_panel
-        self.music_slider.rect = pygame.Rect(panel.left + 76, panel.top + 110, 320, 28)
-        self.sfx_slider.rect = pygame.Rect(panel.left + 76, panel.top + 190, 320, 28)
-        self.mute_button.rect = pygame.Rect(panel.left + 130, panel.top + 245, 220, 60)
-        self.fullscreen_button.rect = pygame.Rect(panel.left + 130, panel.top + 310, 220, 50)
+        self.music_slider.rect = pygame.Rect(panel.left + 76, panel.top + 80, 320, 28)
+        self.sfx_slider.rect = pygame.Rect(panel.left + 76, panel.top + 150, 320, 28)
+        self.mute_button.rect = pygame.Rect(panel.left + 130, panel.top + 200, 220, 50)
+        self.fullscreen_button.rect = pygame.Rect(panel.left + 130, panel.top + 256, 220, 44)
 
     def _truncate_to_width(self, text, max_width):
         if self.game.fonts.tiny.size(text)[0] <= max_width:
@@ -1160,9 +1136,9 @@ class LandingScene(BaseScene):
         self.draw_scene_virgil(self.parrot_pos[0], self.parrot_pos[1])
 
         # Buttons in the left-center area
-        self.play_button.rect = pygame.Rect(80, 290, 300, 96)
-        self.diff_button.rect = pygame.Rect(80, 400, 300, 74)
-        self.settings_button.rect = pygame.Rect(80, 488, 300, 58)
+        self.play_button.rect = pygame.Rect(80, 240, 300, 80)
+        self.diff_button.rect = pygame.Rect(80, 334, 300, 54)
+        self.settings_button.rect = pygame.Rect(80, 398, 300, 38)
         self.play_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.diff_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
         self.settings_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
@@ -1211,9 +1187,9 @@ class CrackScene(BaseScene):
         self.virgil_idle_quotes = CRACK_IDLE_QUOTES
         self.last_virgil_quote = ""
 
-        self.try_button = Button((650, 340, 230, 120), "TRY!", (255, 124, 33), (255, 156, 70), text_color=YELLOW)
-        self.home_button = Button((20, 448, 250, 92), "LANDING", (151, 102, 222), (178, 131, 242), pulse=False)
-        self.lesson_button = Button((650, 470, 230, 92), "LESSON", (90, 191, 102), (115, 212, 128), pulse=False)
+        self.try_button = Button((650, 300, 230, 90), "TRY!", (255, 124, 33), (255, 156, 70), text_color=YELLOW)
+        self.home_button = Button((20, 380, 230, 60), "LANDING", (151, 102, 222), (178, 131, 242), pulse=False)
+        self.lesson_button = Button((650, 400, 230, 42), "LESSON", (90, 191, 102), (115, 212, 128), pulse=False)
 
         self.sparkles: list[Particle] = []
         self.treasure: list[Particle] = []
@@ -1399,8 +1375,8 @@ class CrackScene(BaseScene):
 
         # Panel slides in from bottom
         panel_progress = self._ease(self.cinematic_zoom)
-        panel_y = int(560 + (30 - 560) * panel_progress)
-        panel = pygame.Rect(60, panel_y, 780, 530)
+        panel_y = int(440 + (20 - 440) * panel_progress)
+        panel = pygame.Rect(60, panel_y, 780, 420)
 
         # Outer wooden frame
         pygame.draw.rect(screen, (55, 32, 16), panel.inflate(16, 16), border_radius=32)
@@ -1435,7 +1411,7 @@ class CrackScene(BaseScene):
         )
 
         # Treasure items area
-        item_area = pygame.Rect(panel.left + 20, panel.top + 96, panel.width - 40, 180)
+        item_area = pygame.Rect(panel.left + 20, panel.top + 90, panel.width - 40, 160)
         pygame.draw.rect(screen, (50, 28, 14), item_area, border_radius=18)
         pygame.draw.rect(screen, (70, 42, 20), item_area.inflate(-6, -6), border_radius=16)
         pygame.draw.rect(screen, (110, 72, 32), item_area, width=2, border_radius=18)
@@ -1444,11 +1420,11 @@ class CrackScene(BaseScene):
         draw_funcs = [draw_golden_key, draw_ruby_shield, draw_emerald_scroll,
                       draw_diamond_crown, draw_captains_medal]
         item_positions = [
-            (item_area.left + 130, item_area.top + 45),   # Golden Key (row 1)
-            (item_area.left + 340, item_area.top + 45),   # Ruby Shield (row 1)
-            (item_area.left + 550, item_area.top + 45),   # Emerald Scroll (row 1)
-            (item_area.left + 220, item_area.top + 130),  # Diamond Crown (row 2)
-            (item_area.left + 440, item_area.top + 130),  # Captain's Medal (row 2)
+            (item_area.left + 130, item_area.top + 40),   # Golden Key (row 1)
+            (item_area.left + 340, item_area.top + 40),   # Ruby Shield (row 1)
+            (item_area.left + 550, item_area.top + 40),   # Emerald Scroll (row 1)
+            (item_area.left + 220, item_area.top + 115),  # Diamond Crown (row 2)
+            (item_area.left + 440, item_area.top + 115),  # Captain's Medal (row 2)
         ]
 
         self.treasure_hotspots = []
@@ -1476,31 +1452,12 @@ class CrackScene(BaseScene):
                 pygame.draw.polygon(screen, WHITE,
                                     [(px + 16, py - 10), (px + 20, py - 5), (px + 28, py - 15)], width=2)
 
-            # Lesson preview (short) if tapped
-            if idx in self.treasure_items_tapped:
-                short_lesson = item_info["lesson"][:30]
-                if len(item_info["lesson"]) > 30:
-                    short_lesson += "..."
-                draw_text_outline(screen, short_lesson, self.game.fonts.tiny, (200, 200, 180), BLACK,
-                                  (px, py + 46), center=True)
-
             # Hitbox
             hotspot = pygame.Rect(px - 60, py - 30, 120, 80)
             self.treasure_hotspots.append((hotspot, idx))
 
-        # Active lesson text panel (shown when item recently tapped)
-        if self.active_lesson_text and self.active_lesson_timer > 0:
-            lesson_rect = pygame.Rect(panel.left + 30, panel.top + 290, panel.width - 60, 70)
-            pygame.draw.rect(screen, (50, 28, 14), lesson_rect, border_radius=14)
-            pygame.draw.rect(screen, (210, 165, 60), lesson_rect, width=2, border_radius=14)
-            # Wrap text to fit
-            lines = wrap_text(self.active_lesson_text, self.game.fonts.small, lesson_rect.width - 20)
-            for li, line in enumerate(lines[:3]):
-                draw_text_outline(screen, line, self.game.fonts.small, YELLOW, BLACK,
-                                  (lesson_rect.centerx, lesson_rect.top + 18 + li * 22), center=True)
-
         # Coin row at bottom
-        coin_area = pygame.Rect(panel.left + 60, panel.top + 370, panel.width - 120, 50)
+        coin_area = pygame.Rect(panel.left + 60, panel.top + 325, panel.width - 120, 40)
         pygame.draw.rect(screen, (60, 35, 18), coin_area, border_radius=12)
         pygame.draw.rect(screen, (100, 65, 28), coin_area, width=1, border_radius=12)
 
@@ -1520,10 +1477,10 @@ class CrackScene(BaseScene):
             pulse = abs(math.sin(t * 3))
             glow = (int(255 * 0.7 + 255 * 0.3 * pulse), int(220 * 0.7 + 35 * 0.3 * pulse), int(50 + 50 * pulse))
             draw_text_outline(screen, "TREASURE MASTER!", self.game.fonts.big, glow, BLACK,
-                              (panel.centerx, panel.top + 430), center=True)
+                              (panel.centerx, panel.top + 380), center=True)
         elif self.coins_collected > 0:
             draw_text_outline(screen, f"Coins Collected: {self.coins_collected}", self.game.fonts.tiny,
-                              GOLD, BLACK, (panel.centerx, panel.top + 430), center=True)
+                              GOLD, BLACK, (panel.centerx, panel.top + 380), center=True)
 
     def _resolve_success(self):
         self.win = True
@@ -1779,7 +1736,7 @@ class CrackScene(BaseScene):
                 fallback=lambda s: draw_chest_fallback(s, (450, 340), t, open_amount=0.0, shake=1.0 if self.chest_state == "shake" else 0.0),
             )
 
-        virgil_x, virgil_y = ((790, 454) if self.win else self.virgil_pos)
+        virgil_x, virgil_y = ((790, 360) if self.win else self.virgil_pos)
         self.draw_scene_virgil(virgil_x, virgil_y)
 
         # Clickable hint label — positioned right below the tries panel, near Virgil
@@ -1787,12 +1744,10 @@ class CrackScene(BaseScene):
             draw_text_outline(screen, "(click for hint)", self.game.fonts.tiny, (200, 200, 150), BLACK,
                               (virgil_x, 200), center=True)
 
-        # Title + difficulty (left side, higher — clear of Virgil's speech bubble on the right)
+        # Title centered at top
         title = "Chest Unlocked! Treasure Reveal" if self.win else f"Crack the {self.config.length}-char code!"
         title_color = YELLOW if self.win else ORANGE
-        draw_text_outline(screen, title, self.game.fonts.big, title_color, BLACK, (280, 178), center=True)
-        diff_line = "Legendary Reward Sequence" if self.win else f"Difficulty: {self.config.label}"
-        draw_text_outline(screen, diff_line, self.game.fonts.small, CYAN, BLACK, (280, 226), center=True)
+        draw_text_outline(screen, title, self.game.fonts.big, title_color, BLACK, (450, 40), center=True)
 
         if not self.win:
             for dial in self.dials:
@@ -1807,7 +1762,7 @@ class CrackScene(BaseScene):
                 self.lesson_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
             if self.cinematic_zoom > 0.78:
                 # Show Nina cheering on success
-                self.draw_character_portrait("nina", (80, 540), 60)
+                self.draw_character_portrait("nina", (80, 400), 50)
 
         tries_rect = pygame.Rect(680, 190, 200, 50)
         if not self.win:
@@ -1815,10 +1770,10 @@ class CrackScene(BaseScene):
             draw_text_outline(screen, f"Tries: {self.attempts}", self.game.fonts.small, YELLOW, BLACK, tries_rect.center, center=True)
 
             hint_text = " ".join(v if v is not None else "?" for v in self.revealed)
-            draw_text_outline(screen, f"Hints: {hint_text}", self.game.fonts.tiny, WHITE, BLACK, (450, 480), center=True)
+            draw_text_outline(screen, f"Hints: {hint_text}", self.game.fonts.tiny, WHITE, BLACK, (450, 420), center=True)
 
             # Weak meter
-            x, y, w, h = 300, 530, 300, 34
+            x, y, w, h = 270, 400, 360, 30
             pygame.draw.rect(screen, (238, 224, 203), (x - 5, y - 5, w + 10, h + 10), border_radius=12)
             pygame.draw.rect(screen, BLACK, (x - 5, y - 5, w + 10, h + 10), width=3, border_radius=12)
             pygame.draw.rect(screen, (120, 50, 50), (x, y, w, h), border_radius=10)
@@ -1836,8 +1791,8 @@ class CrackScene(BaseScene):
 class LessonScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self.to_builder_button = Button((90, 530, 340, 54), "BUILD PASSWORD", (84, 190, 96), (110, 214, 122), pulse=False)
-        self.play_again_button = Button((470, 530, 340, 54), "PLAY AGAIN", (255, 172, 50), (255, 196, 80), pulse=False)
+        self.to_builder_button = Button((90, 400, 340, 40), "BUILD PASSWORD", (84, 190, 96), (110, 214, 122), pulse=False)
+        self.play_again_button = Button((470, 400, 340, 40), "PLAY AGAIN", (255, 172, 50), (255, 196, 80), pulse=False)
 
     def enter(self, payload=None):
         self.completed = False
@@ -1860,7 +1815,7 @@ class LessonScene(BaseScene):
 
         screen.blit(self.game._get_overlay_surface((8, 20, 38), 170), (0, 0))
 
-        panel = pygame.Rect(30, 30, 840, 560)
+        panel = pygame.Rect(30, 30, 840, 410)
         draw_panel(screen, panel)
 
         # Title and stars on the same line
@@ -1925,7 +1880,7 @@ class LessonScene(BaseScene):
             self.to_builder_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
             self.play_again_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
-        self.draw_scene_virgil(796, 454, "Remember the golden rules!", show_bubble=False)
+        self.draw_scene_virgil(820, 360)
 
 
 class BuilderScene(BaseScene):
@@ -1936,12 +1891,12 @@ class BuilderScene(BaseScene):
         self.parrot_line = "Build a mighty password with letters, numbers, and symbols!"
         self.parrot_emotion = "talk"
 
-        self.add_letter_button = Button((40, 324, 250, 95), "ADD LETTER", (78, 139, 255), (100, 157, 255))
-        self.add_number_button = Button((325, 324, 250, 95), "ADD NUMBER", (80, 196, 107), (111, 214, 130))
-        self.add_symbol_button = Button((610, 324, 250, 95), "ADD SYMBOL", (255, 146, 68), (255, 168, 97))
-        self.backspace_button = Button((170, 438, 250, 82), "UNDO", (204, 96, 72), (226, 119, 92), pulse=False)
-        self.clear_button = Button((480, 438, 250, 82), "CLEAR", (148, 94, 206), (170, 115, 224), pulse=False)
-        self.finish_button = Button((250, 534, 400, 58), "DONE", (252, 170, 35), (255, 196, 80), pulse=False)
+        self.add_letter_button = Button((40, 290, 250, 68), "ADD LETTER", (78, 139, 255), (100, 157, 255))
+        self.add_number_button = Button((325, 290, 250, 68), "ADD NUMBER", (80, 196, 107), (111, 214, 130))
+        self.add_symbol_button = Button((610, 290, 250, 68), "ADD SYMBOL", (255, 146, 68), (255, 168, 97))
+        self.backspace_button = Button((120, 370, 220, 54), "UNDO", (204, 96, 72), (226, 119, 92), pulse=False)
+        self.clear_button = Button((370, 370, 220, 54), "CLEAR", (148, 94, 206), (170, 115, 224), pulse=False)
+        self.finish_button = Button((620, 370, 220, 54), "DONE", (252, 170, 35), (255, 196, 80), pulse=False)
 
         self.confetti: list[Particle] = []
         self.sparkles: list[Particle] = []
@@ -2134,23 +2089,23 @@ class BuilderScene(BaseScene):
         )
 
         # Virgil on the right
-        self.draw_scene_virgil(790, 500)
+        self.draw_scene_virgil(810, 340)
 
         # Password display box
-        box = pygame.Rect(80, 182, 740, 68)
+        box = pygame.Rect(80, 160, 740, 55)
         pygame.draw.rect(screen, WHITE, box, border_radius=18)
         pygame.draw.rect(screen, BLACK, box, width=5, border_radius=18)
 
         # Title drawn after box so it sits on top
-        draw_text_outline(screen, "Build Your Own Strong Password!", self.game.fonts.small, YELLOW, BLACK, (360, 130), center=True)
+        draw_text_outline(screen, "Build Your Own Strong Password!", self.game.fonts.small, YELLOW, BLACK, (360, 120), center=True)
 
         shown = self.password if self.password else "(click buttons below)"
         if len(shown) > 30:
             shown = shown[:27] + "..."
         draw_text_outline(screen, shown, self.game.fonts.med, BLUE, BLACK, box.center, center=True)
 
-        # Strength bar at y=260, h=52 — gradient from red to yellow to green
-        x, y, w, h = 130, 260, 640, 52
+        # Strength bar — gradient from red to yellow to green
+        x, y, w, h = 130, 224, 640, 40
         pygame.draw.rect(screen, (217, 233, 220), (x - 6, y - 6, w + 12, h + 12), border_radius=16)
         pygame.draw.rect(screen, BLACK, (x - 6, y - 6, w + 12, h + 12), width=4, border_radius=16)
         pygame.draw.rect(screen, (80, 105, 86), (x, y, w, h), border_radius=14)
@@ -2195,11 +2150,11 @@ class BuilderScene(BaseScene):
 class ParentReportScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self.back_button = Button((670, 530, 210, 58), "BACK", (77, 151, 252), (104, 171, 255), pulse=False)
-        self.clear_button = Button((20, 530, 260, 58), "CLEAR PROGRESS", (205, 89, 79), (230, 111, 101), pulse=False)
+        self.back_button = Button((670, 400, 210, 40), "BACK", (77, 151, 252), (104, 171, 255), pulse=False)
+        self.clear_button = Button((20, 400, 260, 40), "CLEAR PROGRESS", (205, 89, 79), (230, 111, 101), pulse=False)
         self.confirm = False
-        self.confirm_yes = Button((300, 350, 140, 64), "YES", (99, 187, 95), (122, 210, 118), pulse=False)
-        self.confirm_no = Button((460, 350, 140, 64), "NO", (189, 101, 97), (211, 126, 120), pulse=False)
+        self.confirm_yes = Button((300, 300, 140, 50), "YES", (99, 187, 95), (122, 210, 118), pulse=False)
+        self.confirm_no = Button((460, 300, 140, 50), "NO", (189, 101, 97), (211, 126, 120), pulse=False)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2229,7 +2184,7 @@ class ParentReportScene(BaseScene):
         t = pygame.time.get_ticks() / 1000.0
         self.draw_world(t)
 
-        panel = pygame.Rect(30, 50, 680, 460)
+        panel = pygame.Rect(30, 50, 680, 385)
         draw_panel(screen, panel, bg_color=(240, 245, 255), border_color=(64, 90, 140))
         draw_text_outline(screen, "Parent / Teacher Report", self.game.fonts.big, DARK_BLUE, BLACK, (450, 96), center=True)
 
@@ -2266,14 +2221,14 @@ class ParentReportScene(BaseScene):
         if self.confirm:
             screen.blit(self.game._get_overlay_surface((0, 0, 0), 120), (0, 0))
 
-            box = pygame.Rect(220, 250, 460, 190)
+            box = pygame.Rect(220, 200, 460, 160)
             draw_panel(screen, box, bg_color=(255, 247, 240), border_color=(120, 70, 60))
-            draw_text_outline(screen, "Clear all progress?", self.game.fonts.med, RED, BLACK, (450, 292), center=True)
-            draw_text_outline(screen, "Settings (mute/volume) will stay saved.", self.game.fonts.tiny, BLACK, WHITE, (450, 322), center=True)
+            draw_text_outline(screen, "Clear all progress?", self.game.fonts.med, RED, BLACK, (450, 240), center=True)
+            draw_text_outline(screen, "Settings (mute/volume) will stay saved.", self.game.fonts.tiny, BLACK, WHITE, (450, 272), center=True)
             self.confirm_yes.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
             self.confirm_no.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
 
-        self.draw_scene_virgil(796, 454, "Reports stay private too.", show_bubble=False)
+        self.draw_scene_virgil(820, 360)
 
 
 class FinaleScene(BaseScene):
@@ -2369,13 +2324,13 @@ class FinaleScene(BaseScene):
             "Keep personal info PRIVATE: name, address, birthday",
             "Only share passwords with trusted grown-ups",
         ]
-        y = 390
+        y = 375
         for tip in tips:
             draw_text_outline(screen, tip, self.game.fonts.tiny, YELLOW, BLACK, (450, y), center=True)
-            y += 28
+            y += 24
 
         # Farewell
-        draw_text_outline(screen, "Stay safe on the seven seas of the internet!", self.game.fonts.small, CYAN, BLACK, (450, 500), center=True)
+        draw_text_outline(screen, "Stay safe on the seven seas of the internet!", self.game.fonts.small, CYAN, BLACK, (450, 435), center=True)
 
         self.draw_particles(self.confetti)
         self.draw_particles(self.sparkles)
