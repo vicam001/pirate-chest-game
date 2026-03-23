@@ -353,6 +353,11 @@ class AudioManager:
         self.sfx["reward"] = self._load_or_tone("assets/audio/sfx/reward.wav", 990, 0.22)
         self.sfx["coins_clink"] = self._load_or_custom("assets/audio/sfx/coins_clink.wav", self._coin_clink)
 
+        # Studio intro SFX (procedural placeholders — drop real WAVs to override)
+        self.sfx["ocean_ambience"] = self._load_or_tone("assets/audio/sfx/ocean_ambience.wav", 120, 2.0)
+        self.sfx["cannon_boom"] = self._load_or_tone("assets/audio/sfx/cannon_boom.wav", 60, 0.4)
+        self.sfx["sparkle"] = self._load_or_tone("assets/audio/sfx/sparkle.wav", 1800, 0.15)
+
         music_path = self.root_dir / "assets/audio/music/island_loop.wav"
         if music_path.exists():
             try:

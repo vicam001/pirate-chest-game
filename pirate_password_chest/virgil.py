@@ -1,19 +1,46 @@
 # === VIRGIL CLASS ===
-# The star character: a wise-cracking pirate parrot with Hollywood-quality animation.
-# Bright red-and-green macaw with eye-patch, golden pirate hat, earring.
+# The star character: a wise-cracking pirate parrot with premium cartoon-quality
+# animation. Vibrant scarlet-red macaw body, emerald-green wings/tail, golden-
+# yellow beak and feet, cute pirate flair (eye-patch, tricorne hat, earring).
+#
 # Drop-in class: call .update(dt) and .draw(surface) each frame.
 # Trigger states with .talk(text), .laugh(), .surprise(), .cheer(), .fly_in().
 #
-# EASY TO CHANGE COLORS OR ADD SPRITES LATER
-# Every color is defined as a named constant at the top of the class.
+# === METHOD CALL REFERENCE (for main game loop) ===
+#   virgil.update(dt)                       — call every frame
+#   virgil.draw(surface)                    — call every frame
+#   virgil.talk(text, duration, show_bubble) — speech + beak animation
+#   virgil.laugh()                          — head back, wing flaps, squint eyes
+#   virgil.surprise()                       — eyes enlarge, feather ruffle
+#   virgil.cheer()                          — wild flapping, sparkles, tail wag
+#   virgil.fly_in(land_x, land_y)           — spiral entrance from off-screen
+#   virgil.set_position(x, y)              — snap position
+#   virgil.is_talking  (property)           — True while in talking state
+#   virgil.is_busy     (property)           — True during fly_in/laugh/surprise/cheer
+#
+# Example scene triggers:
+#   wrong guess  → virgil.laugh() + virgil.talk("Arrr, too weak matey!")
+#   correct guess→ virgil.cheer()
+#   hint given   → virgil.talk(hint_text, duration_seconds=2.5)
+#   new scene    → virgil.fly_in(land_x=760, land_y=320)
+#   shock moment → virgil.surprise()
+#
+# EASY TO TUNE SIZES / COLORS — every value is a named constant below.
 
 from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import List, Tuple
 
 import pygame
+
+try:
+    import pygame.gfxdraw  # anti-aliased drawing where available
+    HAS_GFXDRAW = True
+except ImportError:
+    HAS_GFXDRAW = False
 
 from .constants import BLACK, FONT_NAME, GOLD, WHITE, YELLOW
 
@@ -27,6 +54,8 @@ STATE_SURPRISED = "surprised"
 STATE_CHEER = "cheer"
 STATE_FLY_IN = "fly_in"
 
+
+# === PARTICLE SYSTEM ===
 
 @dataclass
 class _Particle:
@@ -56,15 +85,18 @@ class _Particle:
 # ---------------------------------------------------------------------------
 # EASY TO CHANGE COLORS OR ADD SPRITES LATER
 # ---------------------------------------------------------------------------
-# Body plumage
+
+# === BODY PLUMAGE ===
 BODY_RED = (210, 48, 38)
 BODY_RED_LIGHT = (235, 85, 65)
+BODY_RED_LIGHTER = (245, 120, 95)
 BODY_RED_DARK = (165, 32, 26)
+BODY_RED_DARKER = (130, 24, 18)
 BELLY_CREAM = (255, 200, 100)
 BELLY_OUTLINE = (210, 160, 70)
 BODY_ORANGE = (255, 165, 60)
 
-# Wing plumage
+# === WING PLUMAGE ===
 WING_RED = (210, 48, 38)
 WING_ORANGE = (255, 180, 40)
 WING_GREEN = (32, 162, 75)
@@ -73,47 +105,81 @@ WING_GREEN_DARK = (22, 120, 55)
 WING_TIP_BLUE = (40, 100, 200)
 WING_TIP_YELLOW = (255, 220, 50)
 
-# Tail feathers
+# === TAIL FEATHERS ===
 TAIL_RED = (200, 45, 35)
 TAIL_BLUE = (48, 120, 200)
 TAIL_GREEN = (38, 155, 70)
 TAIL_YELLOW = (250, 210, 50)
 
-# Head
+# === HEAD ===
 HEAD_RED = (220, 55, 40)
 HEAD_LIGHT = (240, 100, 80)
+HEAD_LIGHTER = (250, 140, 110)
 CHEEK_WHITE = (255, 250, 240)
 HEAD_GREEN_TUFT = (45, 180, 75)
 
-# Beak (blue macaw beak)
-BEAK_DARK = (20, 60, 140)
-BEAK_GRAY = (40, 100, 190)
-BEAK_HIGHLIGHT = (80, 160, 250)
-BEAK_BLUE = (50, 120, 220)
-BEAK_BLUE_LIGHT = (80, 160, 250)
+# === BEAK (golden-yellow macaw beak) ===
+BEAK_GOLD = (235, 190, 45)
+BEAK_GOLD_LIGHT = (255, 220, 90)
+BEAK_GOLD_DARK = (180, 140, 30)
+BEAK_HIGHLIGHT = (255, 240, 150)
 
-# Eye
+# === EYE ===
 EYE_WHITE = (255, 255, 252)
 IRIS_GOLD = (200, 160, 40)
 PUPIL = (10, 10, 12)
 EYE_OUTLINE = (40, 30, 25)
+CATCHLIGHT = (255, 255, 255)
 
-# Accessories
+# === ACCESSORIES ===
 HAT_GOLD = (220, 180, 50)
+HAT_GOLD_LIGHT = (245, 210, 80)
 HAT_DARK = (170, 130, 30)
 HAT_BAND = (60, 35, 20)
-FEATHER_WHITE = (255, 250, 245)
+PLUME_RED = (220, 45, 40)
+PLUME_RED_LIGHT = (245, 80, 65)
 EYEPATCH_BLACK = (25, 22, 20)
 EYEPATCH_STRAP = (50, 40, 30)
+SKULL_SILVER = (200, 195, 190)
 EARRING_GOLD = (245, 210, 60)
 
-# Feet
-FEET_GRAY = (90, 85, 80)
-FEET_DARK = (60, 55, 50)
+# === FEET (golden-yellow) ===
+FEET_GOLD = (220, 180, 50)
+FEET_GOLD_DARK = (180, 140, 30)
+
+# === SHADOW ===
+SHADOW_COLOR = (40, 20, 15)
+
+# === RIM / HIGHLIGHT ===
+RIM_GOLD = (255, 235, 150)
+RIM_WHITE = (255, 250, 240)
+
+
+def _aa_circle(surf: pygame.Surface, x: int, y: int, r: int, color: tuple) -> None:
+    """Draw an anti-aliased filled circle using gfxdraw if available."""
+    if HAS_GFXDRAW and r > 1:
+        pygame.gfxdraw.aacircle(surf, x, y, r, color)
+        pygame.gfxdraw.filled_circle(surf, x, y, r, color)
+    else:
+        pygame.draw.circle(surf, color, (x, y), r)
+
+
+def _ease_out_sine(t: float) -> float:
+    return math.sin(t * math.pi * 0.5)
+
+
+def _ease_in_out(t: float) -> float:
+    return t * t * (3.0 - 2.0 * t)
 
 
 class Virgil:
-    """Virgil the pirate parrot -- the star of the show."""
+    """Virgil the pirate parrot -- the star of the show.
+
+    A vibrant scarlet-red macaw with emerald-green wings, golden-yellow beak,
+    pirate hat, eye-patch, and earring. Fully procedurally drawn with
+    pygame.draw calls. Supports idle, talking, laugh, surprise, cheer, and
+    fly-in animation states with smooth transitions.
+    """
 
     def __init__(self, x: int = 700, y: int = 350) -> None:
         # Position (center of the character)
@@ -127,32 +193,50 @@ class Virgil:
         self._state_timer = 0.0
         self._prev_state = STATE_IDLE
 
-        # Wing angle (degrees, 0 = flat along body)
+        # === WING ===
         self._wing_angle = 0.0
         self._wing_target = 0.0
-        self._wing_frame = 0  # for flap cycle
+        self._wing_frame = 0
 
-        # Beak
+        # === BEAK ===
         self._beak_open = 0.0  # 0 closed, 1 fully open
 
-        # Head tilt
+        # === HEAD ===
         self._head_tilt = 0.0  # degrees
+        self._head_bob_y = 0.0  # vertical offset for talking
 
-        # Eye
+        # === EYE ===
         self._blink_timer = 0.0
         self._blink_interval = random.uniform(2.5, 5.0)
         self._is_blinking = False
         self._blink_duration = 0.12
         self._pupil_offset_x = 0.0
         self._pupil_offset_y = 0.0
+        self._eye_scale = 1.0  # 1.0 normal, 1.5 for surprise
+        self._eye_squint = 0.0  # 0 = normal, 1 = fully squinted
 
-        # Hat bounce
+        # === EYEBROW ===
+        self._eyebrow_angle = 0.0  # degrees, positive = raised, negative = furrowed
+
+        # === HAT ===
         self._hat_bounce = 0.0
 
-        # Breathing
+        # === BREATHING / BODY SCALE ===
         self._breath_phase = 0.0
+        self._body_scale = 1.0  # for fly-in scaling
 
-        # Speech
+        # === FEATHER SWAY ===
+        self._feather_sway = 0.0  # wing-tip feather oscillation
+
+        # === TAIL ===
+        self._tail_wag = 0.0  # horizontal offset for cheer
+
+        # === IDLE HEAD TILT ===
+        self._idle_tilt_timer = 0.0
+        self._idle_tilt_interval = random.uniform(4.0, 7.0)
+        self._idle_tilt_target = 0.0
+
+        # === SPEECH ===
         self._speech_text = ""
         self._speech_display = ""
         self._speech_timer = 0.0
@@ -167,28 +251,33 @@ class Virgil:
         self._speech_cache_surfaces: list[tuple[pygame.Surface, pygame.Surface]] = []
         self._speech_cache_size = (100, 60)
 
-        # Particles
+        # === PARTICLES ===
         self._particles: list[_Particle] = []
 
-        # FlyIn
+        # === FLY-IN ===
         self._fly_in_start_x = 0.0
         self._fly_in_start_y = 0.0
 
-        # Laugh specifics
+        # === LAUGH ===
         self._laugh_shake = 0.0
 
-        # Cached surfaces for rotated wings (avoid per-frame allocation)
+        # === CACHED SURFACES ===
         self._wing_surface_r = self._build_wing_surface()
         self._wing_surface_l = pygame.transform.flip(self._wing_surface_r, True, False)
+        self._body_base_surface = self._build_body_surface()
 
         # Ticks reference
         self._t = 0.0
         self._last_cheer_sparkle_step = -1
 
-        # Pre-allocated head surface (avoid per-frame allocation)
-        self._head_surf = pygame.Surface((200, 200), pygame.SRCALPHA)
+        # Pre-allocated head surface
+        self._head_surf = pygame.Surface((220, 220), pygame.SRCALPHA)
 
-        # State handlers (avoid per-frame dict creation)
+        # Shadow surface (semi-transparent)
+        self._shadow_surf = pygame.Surface((80, 20), pygame.SRCALPHA)
+        pygame.draw.ellipse(self._shadow_surf, (*SHADOW_COLOR, 60), (0, 0, 80, 20))
+
+        # State handlers
         self._state_handlers = {
             STATE_IDLE: self._update_idle,
             STATE_WING_FLAP: self._update_wing_flap,
@@ -202,25 +291,68 @@ class Virgil:
         # Visibility
         self.visible = True
 
+    # === CACHED SURFACE BUILDERS ===
+
     def _build_wing_surface(self) -> pygame.Surface:
-        wing_surface = pygame.Surface((45, 85), pygame.SRCALPHA)
+        """Build a single wing with layered color bands and feather detail."""
+        wing_surface = pygame.Surface((50, 90), pygame.SRCALPHA)
         # Top section: RED (shoulder area)
-        pygame.draw.ellipse(wing_surface, WING_RED, (5, 0, 35, 30))
-        # Upper-middle section: ORANGE/YELLOW
-        pygame.draw.ellipse(wing_surface, WING_ORANGE, (5, 18, 35, 28))
-        # Lower section: GREEN
-        pygame.draw.ellipse(wing_surface, WING_GREEN, (5, 38, 35, 26))
-        pygame.draw.ellipse(wing_surface, WING_GREEN_LIGHT, (9, 42, 27, 18))
-        # Tip section: BLUE
-        pygame.draw.ellipse(wing_surface, WING_TIP_BLUE, (7, 56, 31, 18))
-        pygame.draw.ellipse(wing_surface, WING_TIP_YELLOW, (9, 66, 27, 14))
-        # Feather line details
-        for fi in range(4):
-            fy = 12 + fi * 16
-            pygame.draw.line(wing_surface, WING_GREEN_DARK, (11, fy), (33, fy + 2), 1)
-        # Overall wing outline
-        pygame.draw.ellipse(wing_surface, BODY_RED_DARK, (5, 0, 35, 70), width=2)
+        pygame.draw.ellipse(wing_surface, WING_RED, (5, 0, 40, 32))
+        pygame.draw.ellipse(wing_surface, BODY_RED_LIGHT, (10, 4, 28, 20))
+        # Upper-middle: ORANGE/YELLOW
+        pygame.draw.ellipse(wing_surface, WING_ORANGE, (5, 20, 40, 28))
+        # Lower section: GREEN (emerald)
+        pygame.draw.ellipse(wing_surface, WING_GREEN, (5, 40, 40, 28))
+        pygame.draw.ellipse(wing_surface, WING_GREEN_LIGHT, (10, 44, 30, 20))
+        # Tip: BLUE + YELLOW
+        pygame.draw.ellipse(wing_surface, WING_TIP_BLUE, (7, 60, 36, 20))
+        pygame.draw.ellipse(wing_surface, WING_TIP_YELLOW, (10, 68, 30, 16))
+        # Feather separation lines
+        for fi in range(5):
+            fy = 10 + fi * 15
+            pygame.draw.line(wing_surface, WING_GREEN_DARK, (12, fy), (38, fy + 2), 1)
+        # Rim highlight on leading edge
+        pygame.draw.arc(wing_surface, RIM_GOLD, (4, 0, 42, 70), 0.5, 2.5, 1)
+        # Overall outline
+        pygame.draw.ellipse(wing_surface, BODY_RED_DARK, (5, 0, 40, 75), width=2)
         return wing_surface
+
+    def _build_body_surface(self) -> pygame.Surface:
+        """Build the static body base with gradient shading."""
+        bw, bh = 66, 66
+        pad = 6
+        surf = pygame.Surface((bw + pad * 2, bh + pad * 2), pygame.SRCALPHA)
+        cx, cy = surf.get_width() // 2, surf.get_height() // 2
+
+        # Gradient: dark outer → light inner via concentric ellipses
+        for i, (w_frac, h_frac, color) in enumerate([
+            (1.0, 1.0, BODY_RED_DARKER),
+            (0.95, 0.95, BODY_RED_DARK),
+            (0.88, 0.88, BODY_RED),
+            (0.78, 0.78, BODY_RED_LIGHT),
+            (0.65, 0.68, BODY_RED_LIGHTER),
+        ]):
+            ew = int(bw * w_frac)
+            eh = int(bh * h_frac)
+            pygame.draw.ellipse(surf, color, (cx - ew // 2, cy - eh // 2, ew, eh))
+
+        # Orange chest band
+        ow, oh = 38, 22
+        pygame.draw.ellipse(surf, BODY_ORANGE, (cx - ow // 2, cy + 4, ow, oh))
+        # Cream belly
+        cw_b, ch_b = 30, 32
+        pygame.draw.ellipse(surf, BELLY_CREAM, (cx - cw_b // 2, cy + 8, cw_b, ch_b))
+        pygame.draw.ellipse(surf, BELLY_OUTLINE, (cx - cw_b // 2, cy + 8, cw_b, ch_b), width=1)
+        # Feather arc details
+        for fy in range(8, 54, 12):
+            pygame.draw.arc(surf, BODY_RED_DARK,
+                            (cx - 24, cy - 8 + fy, 48, 8), 0.3, math.pi - 0.3, 1)
+        # Rim highlight (top-left)
+        pygame.draw.arc(surf, RIM_GOLD, (cx - bw // 2 + 2, cy - bh // 2 + 2, bw - 4, bh - 4),
+                        1.8, 3.2, 1)
+        # Outer outline
+        pygame.draw.ellipse(surf, BODY_RED_DARK, (cx - bw // 2, cy - bh // 2, bw, bh), width=2)
+        return surf
 
     # === PUBLIC API ===
 
@@ -252,6 +384,7 @@ class Virgil:
         self._fly_in_start_y = self.target_y - 350
         self.x = self._fly_in_start_x
         self.y = self._fly_in_start_y
+        self._body_scale = 0.3
         if land_x is not None:
             self.target_x = land_x
         if land_y is not None:
@@ -306,6 +439,14 @@ class Virgil:
         self._last_cheer_sparkle_step = -1
         if state == STATE_LAUGH:
             self._laugh_shake = 0.0
+        if state == STATE_SURPRISED:
+            self._eye_scale = 1.5
+        if state != STATE_SURPRISED:
+            self._eye_scale = 1.0
+        if state not in (STATE_LAUGH, STATE_TALKING):
+            self._eye_squint = 0.0
+        if state != STATE_FLY_IN:
+            self._body_scale = 1.0
 
     def update(self, dt: float) -> None:
         if not self.visible:
@@ -317,6 +458,9 @@ class Virgil:
         # Blink logic (runs in every state)
         self._update_blink(dt)
 
+        # Feather sway (always)
+        self._feather_sway = math.sin(self._t * 2.2) * 6
+
         # State-specific update
         handler = self._state_handlers.get(self.state, self._update_idle)
         handler(dt)
@@ -324,13 +468,40 @@ class Virgil:
         # Smooth wing angle
         self._wing_angle += (self._wing_target - self._wing_angle) * min(1.0, dt * 18)
 
-        # Smooth head tilt toward zero when idle
+        # Smooth head tilt toward target when idle
         if self.state == STATE_IDLE:
-            target_tilt = math.sin(self._t * 0.7) * 4
-            self._head_tilt += (target_tilt - self._head_tilt) * min(1.0, dt * 3)
+            self._idle_tilt_timer += dt
+            if self._idle_tilt_timer >= self._idle_tilt_interval:
+                self._idle_tilt_timer = 0.0
+                self._idle_tilt_interval = random.uniform(4.0, 7.0)
+                self._idle_tilt_target = random.uniform(-6, 6)
+            self._head_tilt += (self._idle_tilt_target - self._head_tilt) * min(1.0, dt * 2.5)
 
         # Hat bounce decay
         self._hat_bounce *= max(0, 1.0 - dt * 8)
+
+        # Head bob decay (smooth return to 0)
+        self._head_bob_y *= max(0, 1.0 - dt * 6)
+
+        # Eye scale smooth return to 1.0
+        if self.state != STATE_SURPRISED:
+            self._eye_scale += (1.0 - self._eye_scale) * min(1.0, dt * 5)
+
+        # Eye squint decay
+        if self.state not in (STATE_LAUGH, STATE_TALKING):
+            self._eye_squint *= max(0, 1.0 - dt * 4)
+
+        # Eyebrow smooth return
+        if self.state == STATE_IDLE:
+            self._eyebrow_angle *= max(0, 1.0 - dt * 3)
+
+        # Tail wag decay
+        if self.state != STATE_CHEER:
+            self._tail_wag *= max(0, 1.0 - dt * 5)
+
+        # Body scale smooth return
+        if self.state != STATE_FLY_IN:
+            self._body_scale += (1.0 - self._body_scale) * min(1.0, dt * 4)
 
         # Particles
         self._particles = [p for p in self._particles if p.update(dt)]
@@ -338,7 +509,6 @@ class Virgil:
         # Speech timer
         if self._speech_active:
             self._speech_timer += dt
-            # Letter-by-letter reveal
             if self._speech_char_index < len(self._speech_text):
                 self._speech_char_timer += dt
                 chars_per_sec = 40
@@ -347,7 +517,6 @@ class Virgil:
                     self._speech_char_timer -= 1.0 / chars_per_sec
                     self._speech_char_index += 1
                     self._speech_display = self._speech_text[:self._speech_char_index]
-            # Auto-hide after duration (only if all text revealed)
             if (self._speech_char_index >= len(self._speech_text)
                     and self._speech_timer >= self._speech_duration):
                 self._speech_active = False
@@ -357,11 +526,12 @@ class Virgil:
     def _update_idle(self, dt: float) -> None:
         # Gentle breathing wing motion
         self._wing_target = 3 + math.sin(self._breath_phase) * 3
-        # Occasional random head tilt already handled above
+        # Beak closes smoothly
         self._beak_open *= max(0, 1.0 - dt * 10)
+        # Eyebrow neutral
+        self._eyebrow_angle *= max(0, 1.0 - dt * 3)
 
     def _update_wing_flap(self, dt: float) -> None:
-        # 4-frame flap cycle
         cycle = (self._state_timer * 8) % 4
         if cycle < 1:
             self._wing_target = 35
@@ -375,74 +545,145 @@ class Virgil:
             self._set_state(STATE_IDLE)
 
     def _update_talking(self, dt: float) -> None:
-        # Beak opens/closes in sync with "speech"
+        # Beak opens/closes rhythmically — 3 states via sine
         talk_cycle = math.sin(self._state_timer * 14)
         self._beak_open = max(0, talk_cycle) * 0.8
         # Gentle wing movement
         self._wing_target = 5 + math.sin(self._state_timer * 3) * 4
-        # Slight head bob
+        # Head bob forward (small vertical offset)
+        self._head_bob_y = math.sin(self._state_timer * 6) * 2.5
+        # Slight head tilt
         self._head_tilt = math.sin(self._state_timer * 4) * 3
+        # Eyes periodically half-close then open wide
+        eye_cycle = math.sin(self._state_timer * 3.5)
+        self._eye_squint = max(0, eye_cycle) * 0.4
+        # Eyebrow slight raise when talking
+        self._eyebrow_angle = 5 + math.sin(self._state_timer * 5) * 3
         # Done talking when speech finishes
         if not self._speech_active:
             self._set_state(STATE_IDLE)
 
     def _update_laugh(self, dt: float) -> None:
-        # Head thrown back, wings shaking
-        self._head_tilt = -15 + math.sin(self._state_timer * 20) * 5
-        self._laugh_shake = math.sin(self._state_timer * 25) * 4
-        self._wing_target = 20 + math.sin(self._state_timer * 12) * 15
-        self._beak_open = 0.6 + math.sin(self._state_timer * 10) * 0.3
-        self._hat_bounce = abs(math.sin(self._state_timer * 8)) * 6
-        self._is_blinking = True  # eyes closed in joy
-        if self._state_timer > 1.8:
-            self._is_blinking = False
+        t = self._state_timer
+        # Head thrown back 25 degrees with shake
+        self._head_tilt = -25 + math.sin(t * 22) * 5
+        self._laugh_shake = math.sin(t * 25) * 4
+        # 3 distinct wing flaps over 1.8s
+        flap_phase = t * 5.0  # ~3 flaps in 1.8s
+        self._wing_target = 10 + abs(math.sin(flap_phase * math.pi)) * 30
+        # Beak wide open
+        self._beak_open = 0.7 + math.sin(t * 10) * 0.25
+        # Hat bounces twice (at ~0.4s and ~1.0s)
+        bounce1 = max(0, 1.0 - abs(t - 0.4) * 6) * 8
+        bounce2 = max(0, 1.0 - abs(t - 1.0) * 6) * 6
+        self._hat_bounce = max(bounce1, bounce2)
+        # Eyes squint in joy (not fully closed)
+        self._eye_squint = 0.7
+        self._is_blinking = False
+        # Eyebrow raised in delight
+        self._eyebrow_angle = 12
+        # Rosy cheeks handled in draw
+        if t > 1.8:
+            self._eye_squint = 0.0
             self._set_state(STATE_IDLE)
 
     def _update_surprised(self, dt: float) -> None:
-        # Eyes wide, feathers ruffled, quick flutter
+        t = self._state_timer
+        # Eyes enlarge 150% for 0.4s then shrink back
+        if t < 0.4:
+            self._eye_scale = 1.5
+        else:
+            self._eye_scale = 1.5 - min(1.0, (t - 0.4) * 2.5) * 0.5
+        # Head tilted up
         self._head_tilt = 8
-        self._wing_target = 25 + math.sin(self._state_timer * 18) * 10
-        self._beak_open = 0.5
-        self._hat_bounce = 4
-        self._pupil_offset_y = -2  # pupils look up
-        if self._state_timer > 1.2:
+        # Single quick wing flap (up fast, down slow)
+        if t < 0.3:
+            self._wing_target = 40
+        elif t < 0.6:
+            self._wing_target = 5
+        else:
+            self._wing_target = 3 + math.sin(self._breath_phase) * 3
+        # Beak half open
+        self._beak_open = 0.5 * max(0, 1.0 - t * 0.8)
+        self._hat_bounce = max(0, 5 * (1.0 - t * 1.2))
+        self._pupil_offset_y = -2
+        # Eyebrow raised high
+        self._eyebrow_angle = 15
+        if t > 1.2:
             self._pupil_offset_y = 0
+            self._eyebrow_angle = 0
             self._set_state(STATE_IDLE)
 
     def _update_cheer(self, dt: float) -> None:
-        # Wild flapping + hat bouncing + sparkles
-        self._wing_target = 35 * abs(math.sin(self._state_timer * 10))
-        self._hat_bounce = abs(math.sin(self._state_timer * 7)) * 8
-        self._head_tilt = math.sin(self._state_timer * 6) * 8
-        self._beak_open = 0.3 + abs(math.sin(self._state_timer * 5)) * 0.4
-        # Continuous sparkles
-        sparkle_step = int(self._state_timer * 15)
+        t = self._state_timer
+        # Rapid 6-8 frame wing flap loop
+        flap_phase = t * 12  # fast flapping
+        self._wing_target = 5 + abs(math.sin(flap_phase * math.pi)) * 35
+        # Hat bouncing wildly
+        self._hat_bounce = abs(math.sin(t * 8)) * 8
+        # Head tilting
+        self._head_tilt = math.sin(t * 6) * 8
+        # Beak opening/closing
+        self._beak_open = 0.3 + abs(math.sin(t * 5)) * 0.4
+        # Tail wags left-right
+        self._tail_wag = math.sin(t * 10) * 8
+        # Eyebrow excited
+        self._eyebrow_angle = 10
+        # Continuous sparkles (orbiting)
+        sparkle_step = int(t * 15)
         if sparkle_step % 3 == 0 and sparkle_step != self._last_cheer_sparkle_step:
             self._last_cheer_sparkle_step = sparkle_step
-            self._spawn_sparkle_particles(count=2)
-        if self._state_timer > 2.5:
+            # Spawn particles in an orbit pattern
+            orbit_angle = t * 4
+            for i in range(2):
+                a = orbit_angle + i * math.pi
+                ox = math.cos(a) * 50
+                oy = math.sin(a) * 30
+                self._particles.append(_Particle(
+                    x=self.x + ox,
+                    y=self.y - 20 + oy,
+                    vx=math.cos(a) * 30,
+                    vy=-40 + random.uniform(-20, 0),
+                    life=0.8,
+                    max_life=0.8,
+                    size=random.uniform(3, 6),
+                    color=random.choice([GOLD, YELLOW, WHITE, (255, 220, 100)]),
+                    gravity=40,
+                ))
+        if t > 2.5:
             self._set_state(STATE_IDLE)
 
     def _update_fly_in(self, dt: float) -> None:
-        # Entrance from top-right with flapping
-        progress = min(1.0, self._state_timer / 1.2)
-        ease = progress * progress * (3 - 2 * progress)  # smoothstep
-        self.x = self._fly_in_start_x + (self.target_x - self._fly_in_start_x) * ease
+        t = self._state_timer
+        duration = 1.4
+        progress = min(1.0, t / duration)
+        ease = _ease_in_out(progress)
+        # Spiral path: sine offset on x
+        spiral_x = math.sin(progress * math.pi * 3) * 40 * (1.0 - progress)
+        self.x = self._fly_in_start_x + (self.target_x - self._fly_in_start_x) * ease + spiral_x
         self.y = self._fly_in_start_y + (self.target_y - self._fly_in_start_y) * ease
+        # Scale grows from 0.3 to 1.0
+        self._body_scale = 0.3 + 0.7 * ease
         # Vigorous flapping during flight
-        self._wing_target = 35 * abs(math.sin(self._state_timer * 12))
-        self._head_tilt = math.sin(self._state_timer * 5) * 6
+        self._wing_target = 35 * abs(math.sin(t * 12))
+        self._head_tilt = math.sin(t * 5) * 6
         if progress >= 1.0:
-            self.x = self.target_x
-            self.y = self.target_y
-            self._hat_bounce = 6  # landing bounce
-            self._set_state(STATE_IDLE)
+            # Landing bounce
+            bounce_t = t - duration
+            if bounce_t < 0.15:
+                self.y = self.target_y - 8 * math.sin(bounce_t / 0.15 * math.pi)
+            else:
+                self.x = self.target_x
+                self.y = self.target_y
+                self._hat_bounce = 6
+                self._spawn_feather_particles(count=5)
+                self._set_state(STATE_IDLE)
 
     # --- Blink ---
 
     def _update_blink(self, dt: float) -> None:
         if self.state == STATE_LAUGH:
-            return  # laugh handles its own blink
+            return
         self._blink_timer += dt
         if self._is_blinking:
             if self._blink_timer >= self._blink_duration:
@@ -456,7 +697,7 @@ class Virgil:
 
     # === DRAWING ===
     # Virgil is drawn as a cartoon parrot viewed from 3/4 angle.
-    # Key proportions: BIG head (~45% of height), small body, wings at SIDES.
+    # Key proportions: BIG head (~45% of height), plump body, short legs.
     # y coordinate = center of body. Head sits above.
 
     def draw(self, surface: pygame.Surface) -> None:
@@ -467,100 +708,114 @@ class Virgil:
         iy = int(self.y)
         breath = math.sin(self._breath_phase) * 1.5
         shake_x = int(self._laugh_shake) if self.state == STATE_LAUGH else 0
-        bx = ix + shake_x  # base x with shake
+        bx = ix + shake_x
+        scale = self._body_scale
+
+        # === DROP SHADOW ===
+        shadow_w = int(80 * scale)
+        shadow_h = int(20 * scale)
+        if shadow_w > 4 and shadow_h > 2:
+            shadow = pygame.transform.smoothscale(self._shadow_surf, (shadow_w, shadow_h))
+            surface.blit(shadow, (bx - shadow_w // 2, iy + int(56 * scale)))
 
         # Draw order: tail -> left wing -> feet -> body -> right wing -> head -> particles -> speech
-        self._draw_tail(surface, bx, iy, t)
-        self._draw_wing(surface, bx, iy, breath, side=-1)  # left wing BEHIND body
-        self._draw_feet(surface, bx, iy)
-        self._draw_body(surface, bx, iy, breath)
-        self._draw_wing(surface, bx, iy, breath, side=1)   # right wing IN FRONT
-        self._draw_head(surface, bx, iy, breath, t)
+        self._draw_tail(surface, bx, iy, t, scale)
+        self._draw_wing(surface, bx, iy, breath, side=-1, scale=scale)
+        self._draw_feet(surface, bx, iy, scale)
+        self._draw_body(surface, bx, iy, breath, scale)
+        self._draw_wing(surface, bx, iy, breath, side=1, scale=scale)
+        self._draw_head(surface, bx, iy, breath, t, scale)
         self._draw_particles(surface)
         if self._speech_active and self._speech_show_bubble and self._speech_display:
             self._draw_speech_bubble(surface, ix, iy)
 
-    # --- Tail feathers (fan downward behind body) ---
-    def _draw_tail(self, surface: pygame.Surface, x: int, y: int, t: float) -> None:
-        wag = math.sin(t * 3.5) * 4
-        colors = [TAIL_RED, TAIL_GREEN, TAIL_BLUE, TAIL_GREEN, TAIL_RED]
-        base_y = y + 40
+    # === TAIL FEATHERS ===
+    def _draw_tail(self, surface: pygame.Surface, x: int, y: int, t: float,
+                   scale: float = 1.0) -> None:
+        wag = math.sin(t * 3.5) * 4 + self._tail_wag
+        colors = [TAIL_RED, TAIL_GREEN, TAIL_BLUE, TAIL_YELLOW, TAIL_GREEN, TAIL_RED]
+        base_y = y + int(40 * scale)
         for i, col in enumerate(colors):
-            angle = 1.2 + (i - 2) * 0.18 + math.sin(t * 2.8 + i * 0.7) * 0.05
-            tx = x - 10 + i * 5 + int(wag * 0.15)
-            length = 65 - abs(i - 2) * 8
+            angle = 1.2 + (i - 2.5) * 0.16 + math.sin(t * 2.8 + i * 0.7) * 0.05
+            tx = x - 12 + int(i * 5 * scale) + int(wag * 0.15)
+            length = int((70 - abs(i - 2.5) * 8) * scale)
             ex = tx + int(math.cos(angle) * length)
             ey = base_y + int(math.sin(angle) * length)
-            w = max(3, 8 - abs(i - 2))
+            w = max(2, int((9 - abs(i - 2.5) * 1.2) * scale))
+            # Gradient: draw 2-3 overlapping lines with color shift
+            dark_col = tuple(max(0, c - 35) for c in col)
+            pygame.draw.line(surface, dark_col, (tx, base_y), (ex, ey), w + 1)
             pygame.draw.line(surface, col, (tx, base_y), (ex, ey), w)
+            # Lighter center stripe
+            light_col = tuple(min(255, c + 40) for c in col)
+            if w > 3:
+                pygame.draw.line(surface, light_col, (tx, base_y), (ex, ey), max(1, w - 3))
             # Rounded feather tip
-            pygame.draw.ellipse(surface, col, (ex - w, ey - 2, w * 2, 8))
+            pygame.draw.ellipse(surface, col, (ex - w, ey - 2, w * 2, max(4, int(8 * scale))))
 
-    # --- Feet ---
-    def _draw_feet(self, surface: pygame.Surface, x: int, y: int) -> None:
+    # === FEET ===
+    def _draw_feet(self, surface: pygame.Surface, x: int, y: int,
+                   scale: float = 1.0) -> None:
         for fx_off in (-12, 8):
-            fy = y + 48
-            leg_x = x + fx_off
+            fy = y + int(48 * scale)
+            leg_x = x + int(fx_off * scale)
+            leg_w = max(3, int(5 * scale))
+            leg_len = int(14 * scale)
             # Leg
-            pygame.draw.line(surface, FEET_GRAY, (leg_x, fy), (leg_x, fy + 14), 4)
+            pygame.draw.line(surface, FEET_GOLD, (leg_x, fy), (leg_x, fy + leg_len), leg_w)
+            # Rim highlight on leg
+            pygame.draw.line(surface, FEET_GOLD_DARK, (leg_x + 1, fy), (leg_x + 1, fy + leg_len), 1)
             # Three toes spread forward
+            toe_len = int(10 * scale)
             for ta in (-0.6, 0.0, 0.6):
-                tx = leg_x + int(math.cos(ta) * 10)
-                ty = fy + 14 + int(abs(math.sin(ta + 1.0)) * 4) + 3
-                pygame.draw.line(surface, FEET_GRAY, (leg_x, fy + 14), (tx, ty), 3)
-                pygame.draw.circle(surface, FEET_DARK, (tx, ty), 2)
+                tx = leg_x + int(math.cos(ta) * toe_len)
+                ty = fy + leg_len + int(abs(math.sin(ta + 1.0)) * 4 * scale) + int(3 * scale)
+                toe_w = max(2, int(3 * scale))
+                pygame.draw.line(surface, FEET_GOLD, (leg_x, fy + leg_len), (tx, ty), toe_w)
+                # Tiny claw
+                _aa_circle(surface, tx, ty, max(1, int(2 * scale)), FEET_GOLD_DARK)
 
-    # --- Body (smaller, egg-shaped, below the big head) ---
-    def _draw_body(self, surface: pygame.Surface, x: int, y: int, breath: float) -> None:
+    # === BODY ===
+    def _draw_body(self, surface: pygame.Surface, x: int, y: int,
+                   breath: float, scale: float = 1.0) -> None:
         b = int(breath)
-        # Main red body — egg shape (wider and chubbier)
-        bw, bh = 62, 62
-        body_rect = (x - bw // 2, y + b, bw, bh)
-        pygame.draw.ellipse(surface, BODY_RED, body_rect)
-        # Lighter front
-        fw, fh = 42, 44
-        pygame.draw.ellipse(surface, BODY_RED_LIGHT, (x - fw // 2, y + 8 + b, fw, fh))
-        # Orange band between red and belly
-        ow, oh = 34, 20
-        pygame.draw.ellipse(surface, BODY_ORANGE, (x - ow // 2, y + 12 + b, ow, oh))
-        # Cream/orange belly
-        cw, ch = 28, 30
-        pygame.draw.ellipse(surface, BELLY_CREAM, (x - cw // 2, y + 16 + b, cw, ch))
-        pygame.draw.ellipse(surface, BELLY_OUTLINE, (x - cw // 2, y + 16 + b, cw, ch), width=1)
-        # Feather arcs
-        for fy in range(10, 52, 14):
-            pygame.draw.arc(surface, BODY_RED_DARK,
-                            (x - 22, y + fy + b, 44, 8), 0.3, math.pi - 0.3, 1)
-        # Outline
-        pygame.draw.ellipse(surface, BODY_RED_DARK, body_rect, width=2)
+        # Breathing scale: body pulses 98-102%
+        breath_scale = 1.0 + math.sin(self._breath_phase) * 0.02
+        total_scale = scale * breath_scale
 
-    # --- Single wing (called once for left=-1, once for right=1) ---
+        bw, bh = self._body_base_surface.get_size()
+        sw = max(4, int(bw * total_scale))
+        sh = max(4, int(bh * total_scale))
+        scaled = pygame.transform.smoothscale(self._body_base_surface, (sw, sh))
+        surface.blit(scaled, (x - sw // 2, y + b - sh // 2 + int(4 * scale)))
+
+    # === WING (single, called for left=-1 and right=1) ===
     def _draw_wing(self, surface: pygame.Surface, x: int, y: int,
-                   breath: float, side: int) -> None:
+                   breath: float, side: int, scale: float = 1.0) -> None:
         b = int(breath)
         angle = self._wing_angle
 
         ws = self._wing_surface_l if side == -1 else self._wing_surface_r
 
-        # Rotate around the SHOULDER (top of the wing surface)
+        # Scale wing if needed
+        if abs(scale - 1.0) > 0.01:
+            ww, wh = ws.get_size()
+            ws = pygame.transform.smoothscale(ws, (max(4, int(ww * scale)),
+                                                    max(4, int(wh * scale))))
+
         rot_angle = angle * side
-        # Pivot is at the top-center of the wing surface
         rotated = pygame.transform.rotate(ws, rot_angle)
 
-        # Shoulder position: at the side of the body, near the top
-        shoulder_x = x + side * 28
-        shoulder_y = y + 8 + b
+        shoulder_x = x + int(side * 28 * scale)
+        shoulder_y = y + int(8 * scale) + b
 
-        # After rotation, we need to offset so the shoulder stays in place
         rw, rh = rotated.get_size()
-        # The pivot was at (22, 0) in the original 45-wide surface
-        pivot_in_orig = (22 if side == 1 else 22, 0)
-        # After rotation, find where that pivot ended up
-        cos_a = math.cos(math.radians(-rot_angle))
-        sin_a = math.sin(math.radians(-rot_angle))
+        pivot_in_orig = (ws.get_width() // 2, 0)
         orig_cx, orig_cy = ws.get_width() / 2, ws.get_height() / 2
         dx = pivot_in_orig[0] - orig_cx
         dy = pivot_in_orig[1] - orig_cy
+        cos_a = math.cos(math.radians(-rot_angle))
+        sin_a = math.sin(math.radians(-rot_angle))
         new_dx = dx * cos_a - dy * sin_a
         new_dy = dx * sin_a + dy * cos_a
         pivot_in_rotated = (rw / 2 + new_dx, rh / 2 + new_dy)
@@ -569,174 +824,349 @@ class Virgil:
         blit_y = shoulder_y - pivot_in_rotated[1]
         surface.blit(rotated, (int(blit_x), int(blit_y)))
 
-    # --- Head (BIG, with hat, eye-patch, earring, beak) ---
+        # === WING-TIP FEATHER SWAY ===
+        # Draw 3-4 individual longer feathers extending from wing bottom
+        sway = self._feather_sway
+        wing_bottom_x = shoulder_x + int(side * 8 * scale)
+        wing_bottom_y = shoulder_y + int(65 * scale)
+        feather_colors = [WING_GREEN, WING_TIP_BLUE, WING_TIP_YELLOW, WING_GREEN_LIGHT]
+        for fi in range(4):
+            f_angle = (1.3 + fi * 0.15 + sway * 0.015) * side
+            f_len = int((18 + fi * 5) * scale)
+            fx = wing_bottom_x + int(fi * 4 * side * scale)
+            fy = wing_bottom_y - int(fi * 8 * scale)
+            fex = fx + int(math.cos(f_angle + 1.2) * f_len)
+            fey = fy + int(math.sin(f_angle + 1.2) * f_len)
+            fw = max(1, int((3 - fi * 0.5) * scale))
+            pygame.draw.line(surface, feather_colors[fi % len(feather_colors)],
+                             (fx, fy), (fex, fey), fw)
+
+    # === HEAD (big, with hat, eye-patch, earring, beak, eyebrows) ===
     def _draw_head(self, surface: pygame.Surface, x: int, y: int,
-                   breath: float, t: float) -> None:
+                   breath: float, t: float, scale: float = 1.0) -> None:
         b = int(breath)
         hx = x
-        hy = y - 22 + b  # head sits on top of body
+        hy = y - int(22 * scale) + b + int(self._head_bob_y)
         tilt = self._head_tilt
 
-        # Head surface — large enough for hat + feather plume
-        HS = 200  # head surface size
+        HS = 220
         head_surf = self._head_surf
         head_surf.fill((0, 0, 0, 0))
-        cx, cy = HS // 2, HS // 2 + 10  # center of face within head surface
+        cx, cy = HS // 2, HS // 2 + 12
 
-        # --- Main head shape (larger for cuter proportions) ---
-        head_r = 40
-        pygame.draw.circle(head_surf, HEAD_RED, (cx, cy), head_r)
+        head_r = int(40 * scale)
+
+        # === MAIN HEAD SHAPE (gradient via concentric circles) ===
+        for r_frac, color in [
+            (1.0, BODY_RED_DARK),
+            (0.92, HEAD_RED),
+            (0.82, HEAD_LIGHT),
+            (0.55, HEAD_LIGHTER),
+        ]:
+            r = int(head_r * r_frac)
+            if r > 0:
+                _aa_circle(head_surf, cx - int(2 * r_frac), cy - int(6 * r_frac), r, color)
+
+        # Main head circle on top
+        _aa_circle(head_surf, cx, cy, head_r, HEAD_RED)
         # Highlight on forehead
-        pygame.draw.circle(head_surf, HEAD_LIGHT, (cx - 6, cy - 16), 20)
-        # White cheek patch (macaw bare skin area — left cheek)
-        pygame.draw.ellipse(head_surf, CHEEK_WHITE, (cx - 36, cy + 4, 26, 20))
-        pygame.draw.ellipse(head_surf, (225, 218, 210), (cx - 36, cy + 4, 26, 20), width=1)
+        _aa_circle(head_surf, cx - 6, cy - int(16 * scale), int(20 * scale), HEAD_LIGHT)
+        _aa_circle(head_surf, cx - 8, cy - int(20 * scale), int(10 * scale), HEAD_LIGHTER)
+
+        # White cheek patch (macaw bare skin area)
+        cheek_rect = (cx - int(36 * scale), cy + int(4 * scale), int(26 * scale), int(20 * scale))
+        pygame.draw.ellipse(head_surf, CHEEK_WHITE, cheek_rect)
+        pygame.draw.ellipse(head_surf, (225, 218, 210), cheek_rect, width=1)
+
+        # Rim highlight (top-left arc)
+        if head_r > 8:
+            pygame.draw.arc(head_surf, RIM_GOLD,
+                            (cx - head_r + 2, cy - head_r + 2, head_r * 2 - 4, head_r * 2 - 4),
+                            1.8, 3.2, 1)
+
         # Head outline
         pygame.draw.circle(head_surf, BODY_RED_DARK, (cx, cy), head_r, width=2)
-        # Green feather tufts at top of head
-        for tuft_i, tuft_off in enumerate([-8, 0, 8]):
-            tuft_x = cx + tuft_off
-            tuft_y_base = cy - head_r + 2
-            tuft_y_tip = tuft_y_base - 10 - tuft_i % 2 * 4
-            pygame.draw.line(head_surf, HEAD_GREEN_TUFT,
-                             (tuft_x, tuft_y_base), (tuft_x + tuft_off // 3, tuft_y_tip), 3)
-            pygame.draw.circle(head_surf, HEAD_GREEN_TUFT,
-                               (tuft_x + tuft_off // 3, tuft_y_tip), 3)
 
-        # --- Left eye (visible, BIG and expressive) ---
-        ex_l, ey_l = cx - 12, cy - 4
-        ew, eh = 22, 20
-        # White
-        pygame.draw.ellipse(head_surf, EYE_WHITE, (ex_l - ew // 2, ey_l - eh // 2, ew, eh))
-        if self._is_blinking:
+        # Green feather tufts at top
+        for tuft_i, tuft_off in enumerate([-10, -3, 3, 10]):
+            tuft_x = cx + int(tuft_off * scale)
+            tuft_y_base = cy - head_r + int(2 * scale)
+            tuft_y_tip = tuft_y_base - int((12 + tuft_i % 2 * 5) * scale)
+            sway_off = math.sin(t * 2.5 + tuft_i * 0.8) * 2
+            pygame.draw.line(head_surf, HEAD_GREEN_TUFT,
+                             (tuft_x, tuft_y_base),
+                             (int(tuft_x + tuft_off * 0.3 + sway_off), tuft_y_tip), max(2, int(3 * scale)))
+            _aa_circle(head_surf, int(tuft_x + tuft_off * 0.3 + sway_off), tuft_y_tip,
+                       max(2, int(3 * scale)), HEAD_GREEN_TUFT)
+
+        # === LEFT EYE (visible, BIG and expressive) ===
+        e_scale = self._eye_scale
+        squint = self._eye_squint
+        ex_l, ey_l = cx - int(12 * scale), cy - int(4 * scale)
+        ew = int(22 * scale * e_scale)
+        eh = int(20 * scale * e_scale * (1.0 - squint * 0.5))  # squint reduces height
+
+        # White of eye
+        eye_rect = (ex_l - ew // 2, ey_l - eh // 2, ew, eh)
+        pygame.draw.ellipse(head_surf, EYE_WHITE, eye_rect)
+
+        if self._is_blinking or squint > 0.8:
+            # Closed/squinted eye — curved arc
+            arc_y = ey_l - int(2 * scale)
+            arc_w = int(16 * scale * e_scale)
             pygame.draw.arc(head_surf, EYE_OUTLINE,
-                            (ex_l - 8, ey_l - 2, 16, 10), 0.3, math.pi - 0.3, 3)
+                            (ex_l - arc_w // 2, arc_y, arc_w, int(10 * scale)),
+                            0.3, math.pi - 0.3, max(2, int(3 * scale)))
         else:
             px = ex_l + int(self._pupil_offset_x)
             py = ey_l + int(self._pupil_offset_y)
-            pygame.draw.circle(head_surf, IRIS_GOLD, (px, py), 7)
-            pygame.draw.circle(head_surf, PUPIL, (px, py), 4)
-            pygame.draw.circle(head_surf, WHITE, (px + 3, py - 3), 2)
-            pygame.draw.circle(head_surf, (230, 235, 245), (px - 1, py + 2), 1)
-        pygame.draw.ellipse(head_surf, EYE_OUTLINE, (ex_l - ew // 2, ey_l - eh // 2, ew, eh), width=2)
+            iris_r = max(3, int(7 * scale * e_scale))
+            pupil_r = max(2, int(4 * scale * e_scale))
+            _aa_circle(head_surf, px, py, iris_r, IRIS_GOLD)
+            _aa_circle(head_surf, px, py, pupil_r, PUPIL)
+            # Catchlights (two: big and small)
+            cl_r1 = max(1, int(2.5 * scale * e_scale))
+            cl_r2 = max(1, int(1.2 * scale * e_scale))
+            _aa_circle(head_surf, px + int(3 * scale), py - int(3 * scale), cl_r1, CATCHLIGHT)
+            _aa_circle(head_surf, px - int(1 * scale), py + int(2 * scale), cl_r2, (230, 235, 245))
 
-        # --- Right eye — eye-patch ---
-        ex_r, ey_r = cx + 14, cy - 4
+        pygame.draw.ellipse(head_surf, EYE_OUTLINE, eye_rect, width=2)
+
+        # === EYEBROW FEATHERS ===
+        eb_angle = self._eyebrow_angle
+        eb_x = ex_l
+        eb_y = ey_l - eh // 2 - int(4 * scale)
+        eb_len = int(10 * scale)
+        rad = math.radians(-eb_angle)
+        for eb_off in (-4, 4):
+            bx1 = eb_x + int(eb_off * scale)
+            by1 = eb_y
+            bx2 = bx1 + int(math.cos(rad - 0.3) * eb_len * (1 if eb_off > 0 else -1))
+            by2 = by1 + int(math.sin(rad - 0.3) * eb_len)
+            pygame.draw.line(head_surf, BODY_RED_DARK, (bx1, by1), (bx2, by2),
+                             max(2, int(3 * scale)))
+
+        # === RIGHT EYE — EYE-PATCH ===
+        ex_r, ey_r = cx + int(14 * scale), cy - int(4 * scale)
         # Strap across head
-        pygame.draw.line(head_surf, EYEPATCH_STRAP, (cx - 28, cy - 22), (ex_r + 12, ey_r - 6), 3)
-        pygame.draw.line(head_surf, EYEPATCH_STRAP, (ex_r + 12, ey_r - 6), (ex_r + 6, ey_r + 14), 3)
+        strap_w = max(2, int(3 * scale))
+        pygame.draw.line(head_surf, EYEPATCH_STRAP,
+                         (cx - int(28 * scale), cy - int(22 * scale)),
+                         (ex_r + int(12 * scale), ey_r - int(6 * scale)), strap_w)
+        pygame.draw.line(head_surf, EYEPATCH_STRAP,
+                         (ex_r + int(12 * scale), ey_r - int(6 * scale)),
+                         (ex_r + int(6 * scale), ey_r + int(14 * scale)), strap_w)
         # Patch
-        pygame.draw.circle(head_surf, EYEPATCH_BLACK, (ex_r, ey_r), 11)
-        pygame.draw.circle(head_surf, (50, 45, 40), (ex_r, ey_r), 11, width=2)
-        # Skull on patch
-        pygame.draw.circle(head_surf, (190, 185, 175), (ex_r, ey_r - 1), 4)
+        patch_r = int(11 * scale)
+        _aa_circle(head_surf, ex_r, ey_r, patch_r, EYEPATCH_BLACK)
+        pygame.draw.circle(head_surf, (50, 45, 40), (ex_r, ey_r), patch_r, width=2)
+        # Silver skull charm
+        skull_r = max(2, int(4 * scale))
+        _aa_circle(head_surf, ex_r, ey_r - int(1 * scale), skull_r, SKULL_SILVER)
         for sx_off in (-2, 2):
-            pygame.draw.circle(head_surf, EYEPATCH_BLACK, (ex_r + sx_off, ey_r - 2), 1)
-        pygame.draw.line(head_surf, (190, 185, 175), (ex_r - 3, ey_r + 2), (ex_r + 3, ey_r + 2), 1)
+            _aa_circle(head_surf, ex_r + int(sx_off * scale), ey_r - int(2 * scale),
+                       max(1, int(1 * scale)), EYEPATCH_BLACK)
+        pygame.draw.line(head_surf, SKULL_SILVER,
+                         (ex_r - int(3 * scale), ey_r + int(2 * scale)),
+                         (ex_r + int(3 * scale), ey_r + int(2 * scale)), 1)
+        # Crossbones
+        pygame.draw.line(head_surf, SKULL_SILVER,
+                         (ex_r - int(5 * scale), ey_r + int(0 * scale)),
+                         (ex_r + int(5 * scale), ey_r + int(5 * scale)), 1)
+        pygame.draw.line(head_surf, SKULL_SILVER,
+                         (ex_r + int(5 * scale), ey_r + int(0 * scale)),
+                         (ex_r - int(5 * scale), ey_r + int(5 * scale)), 1)
 
-        # --- Beak (large, bright BLUE macaw beak) ---
+        # === BEAK (golden-yellow, large, curved) ===
         beak_open = int(self._beak_open * 10)
-        bk_x = cx + 22  # beak starts right of center
-        bk_y = cy + 4
-        # Upper beak (large, curved, bright blue)
-        upper = [(bk_x, bk_y - 5), (bk_x + 36, bk_y + 2),
-                 (bk_x + 32, bk_y + 12), (bk_x, bk_y + 7)]
-        pygame.draw.polygon(head_surf, BEAK_BLUE, upper)
+        bk_x = cx + int(22 * scale)
+        bk_y = cy + int(4 * scale)
+        bk_s = scale
+
+        # Upper beak
+        upper = [
+            (bk_x, bk_y - int(5 * bk_s)),
+            (bk_x + int(36 * bk_s), bk_y + int(2 * bk_s)),
+            (bk_x + int(32 * bk_s), bk_y + int(12 * bk_s)),
+            (bk_x, bk_y + int(7 * bk_s)),
+        ]
+        pygame.draw.polygon(head_surf, BEAK_GOLD, upper)
         # Highlight on upper beak
-        highlight = [(bk_x + 2, bk_y - 3), (bk_x + 28, bk_y + 1),
-                     (bk_x + 24, bk_y + 6), (bk_x + 2, bk_y + 3)]
-        pygame.draw.polygon(head_surf, BEAK_BLUE_LIGHT, highlight)
-        pygame.draw.polygon(head_surf, BEAK_DARK, upper, width=2)
+        highlight = [
+            (bk_x + int(2 * bk_s), bk_y - int(3 * bk_s)),
+            (bk_x + int(28 * bk_s), bk_y + int(1 * bk_s)),
+            (bk_x + int(24 * bk_s), bk_y + int(6 * bk_s)),
+            (bk_x + int(2 * bk_s), bk_y + int(3 * bk_s)),
+        ]
+        pygame.draw.polygon(head_surf, BEAK_GOLD_LIGHT, highlight)
+        # Top rim highlight
+        rim_pts = [
+            (bk_x + int(2 * bk_s), bk_y - int(4 * bk_s)),
+            (bk_x + int(30 * bk_s), bk_y + int(0 * bk_s)),
+        ]
+        pygame.draw.line(head_surf, BEAK_HIGHLIGHT, rim_pts[0], rim_pts[1],
+                         max(1, int(1 * bk_s)))
+        pygame.draw.polygon(head_surf, BEAK_GOLD_DARK, upper, width=2)
         # Hook curve at tip
-        pygame.draw.arc(head_surf, BEAK_DARK, (bk_x + 26, bk_y, 14, 14), -0.6, 1.2, 2)
+        pygame.draw.arc(head_surf, BEAK_GOLD_DARK,
+                        (bk_x + int(26 * bk_s), bk_y, int(14 * bk_s), int(14 * bk_s)),
+                        -0.6, 1.2, 2)
         # Nostril
-        pygame.draw.circle(head_surf, BEAK_DARK, (bk_x + 14, bk_y + 1), 2)
-        # Lower beak (slightly darker blue)
-        lower = [(bk_x, bk_y + 9 + beak_open),
-                 (bk_x + 26, bk_y + 13 + beak_open),
-                 (bk_x, bk_y + 15 + beak_open)]
-        pygame.draw.polygon(head_surf, BEAK_GRAY, lower)
-        pygame.draw.polygon(head_surf, BEAK_DARK, lower, width=1)
-        # Mouth interior
+        _aa_circle(head_surf, bk_x + int(14 * bk_s), bk_y + int(1 * bk_s),
+                   max(1, int(2 * bk_s)), BEAK_GOLD_DARK)
+
+        # Lower beak
+        lower = [
+            (bk_x, bk_y + int(9 * bk_s) + beak_open),
+            (bk_x + int(26 * bk_s), bk_y + int(13 * bk_s) + beak_open),
+            (bk_x, bk_y + int(15 * bk_s) + beak_open),
+        ]
+        pygame.draw.polygon(head_surf, BEAK_GOLD_DARK, lower)
+        pygame.draw.polygon(head_surf, (160, 130, 25), lower, width=1)
+
+        # Mouth interior when open
         if self._beak_open > 0.15:
-            mouth = [(bk_x + 2, bk_y + 7), (bk_x + 24, bk_y + 11),
-                     (bk_x + 22, bk_y + 11 + beak_open), (bk_x + 2, bk_y + 9 + beak_open)]
+            mouth = [
+                (bk_x + int(2 * bk_s), bk_y + int(7 * bk_s)),
+                (bk_x + int(24 * bk_s), bk_y + int(11 * bk_s)),
+                (bk_x + int(22 * bk_s), bk_y + int(11 * bk_s) + beak_open),
+                (bk_x + int(2 * bk_s), bk_y + int(9 * bk_s) + beak_open),
+            ]
             pygame.draw.polygon(head_surf, (160, 55, 65), mouth)
             # Tongue
+            tongue_w = int(12 * bk_s)
+            tongue_h = int(5 * bk_s)
             pygame.draw.ellipse(head_surf, (200, 90, 100),
-                                (bk_x + 4, bk_y + 9 + beak_open // 2, 12, 5))
+                                (bk_x + int(4 * bk_s),
+                                 bk_y + int(9 * bk_s) + beak_open // 2,
+                                 tongue_w, tongue_h))
 
-        # --- Earring (gold hoop on left side) ---
-        ear_x, ear_y = cx - 30, cy + 16
-        pygame.draw.circle(head_surf, EARRING_GOLD, (ear_x, ear_y), 5, width=2)
-        pygame.draw.circle(head_surf, (255, 235, 100), (ear_x + 1, ear_y - 2), 2)
+        # === EARRING (gold hoop on left side) ===
+        ear_x, ear_y = cx - int(30 * scale), cy + int(16 * scale)
+        ear_r = max(3, int(5 * scale))
+        pygame.draw.circle(head_surf, EARRING_GOLD, (ear_x, ear_y), ear_r, width=max(1, int(2 * scale)))
+        _aa_circle(head_surf, ear_x + int(1 * scale), ear_y - int(2 * scale),
+                   max(1, int(2 * scale)), (255, 235, 100))
 
-        # --- Pirate hat (sits ON TOP of head, clearly above) ---
+        # === PIRATE HAT (golden tricorne with red feather plume) ===
         hat_y_off = -int(self._hat_bounce)
-        hat_cy = cy - 40 + hat_y_off  # well above the head
+        hat_cy = cy - int(40 * scale) + hat_y_off
         # Brim (wide ellipse)
-        brim_w, brim_h = 80, 14
+        brim_w, brim_h = int(80 * scale), int(14 * scale)
         pygame.draw.ellipse(head_surf, HAT_DARK,
-                            (cx - brim_w // 2, hat_cy + 12, brim_w, brim_h))
+                            (cx - brim_w // 2, hat_cy + int(12 * scale), brim_w, brim_h))
         pygame.draw.ellipse(head_surf, HAT_GOLD,
-                            (cx - brim_w // 2 + 2, hat_cy + 13, brim_w - 4, brim_h - 2))
+                            (cx - brim_w // 2 + 2, hat_cy + int(13 * scale),
+                             brim_w - 4, brim_h - 2))
+        # Brim rim highlight
+        pygame.draw.arc(head_surf, HAT_GOLD_LIGHT,
+                        (cx - brim_w // 2 + 1, hat_cy + int(12 * scale), brim_w - 2, brim_h),
+                        0.2, math.pi - 0.2, 1)
         # Crown (tricorn — upward triangle)
-        crown_h = 24
-        crown = [(cx - 28, hat_cy + 16), (cx, hat_cy - crown_h + 8), (cx + 28, hat_cy + 16)]
+        crown_h = int(24 * scale)
+        crown_hw = int(28 * scale)
+        crown = [(cx - crown_hw, hat_cy + int(16 * scale)),
+                 (cx, hat_cy - crown_h + int(8 * scale)),
+                 (cx + crown_hw, hat_cy + int(16 * scale))]
         pygame.draw.polygon(head_surf, HAT_DARK, crown)
-        inner_crown = [(cx - 22, hat_cy + 14), (cx, hat_cy - crown_h + 12), (cx + 22, hat_cy + 14)]
+        inner_hw = int(22 * scale)
+        inner_crown = [(cx - inner_hw, hat_cy + int(14 * scale)),
+                       (cx, hat_cy - crown_h + int(12 * scale)),
+                       (cx + inner_hw, hat_cy + int(14 * scale))]
         pygame.draw.polygon(head_surf, HAT_GOLD, inner_crown)
+        # Crown rim highlight
+        pygame.draw.line(head_surf, HAT_GOLD_LIGHT,
+                         (cx - inner_hw + 3, hat_cy + int(13 * scale)),
+                         (cx, hat_cy - crown_h + int(13 * scale)), 1)
         # Band
-        pygame.draw.line(head_surf, HAT_BAND, (cx - 24, hat_cy + 14), (cx + 24, hat_cy + 14), 3)
+        pygame.draw.line(head_surf, HAT_BAND,
+                         (cx - int(24 * scale), hat_cy + int(14 * scale)),
+                         (cx + int(24 * scale), hat_cy + int(14 * scale)),
+                         max(2, int(3 * scale)))
         # Skull emblem
-        pygame.draw.circle(head_surf, (235, 230, 220), (cx, hat_cy + 6), 5)
-        pygame.draw.circle(head_surf, HAT_DARK, (cx - 2, hat_cy + 5), 1)
-        pygame.draw.circle(head_surf, HAT_DARK, (cx + 2, hat_cy + 5), 1)
-        pygame.draw.line(head_surf, (210, 205, 195), (cx - 3, hat_cy + 9), (cx + 3, hat_cy + 9), 1)
-        # Crossbones behind skull
-        pygame.draw.line(head_surf, (210, 205, 195), (cx - 6, hat_cy + 2), (cx + 6, hat_cy + 10), 1)
-        pygame.draw.line(head_surf, (210, 205, 195), (cx + 6, hat_cy + 2), (cx - 6, hat_cy + 10), 1)
-        # White feather plume (curves upward from right side of hat)
+        skull_cx, skull_cy = cx, hat_cy + int(6 * scale)
+        _aa_circle(head_surf, skull_cx, skull_cy, max(3, int(5 * scale)), (235, 230, 220))
+        _aa_circle(head_surf, skull_cx - int(2 * scale), skull_cy - int(1 * scale),
+                   max(1, int(1 * scale)), HAT_DARK)
+        _aa_circle(head_surf, skull_cx + int(2 * scale), skull_cy - int(1 * scale),
+                   max(1, int(1 * scale)), HAT_DARK)
+        pygame.draw.line(head_surf, (210, 205, 195),
+                         (skull_cx - int(3 * scale), skull_cy + int(3 * scale)),
+                         (skull_cx + int(3 * scale), skull_cy + int(3 * scale)), 1)
+        # Crossbones
+        cb_s = int(6 * scale)
+        pygame.draw.line(head_surf, (210, 205, 195),
+                         (skull_cx - cb_s, skull_cy - int(2 * scale)),
+                         (skull_cx + cb_s, skull_cy + int(4 * scale)), 1)
+        pygame.draw.line(head_surf, (210, 205, 195),
+                         (skull_cx + cb_s, skull_cy - int(2 * scale)),
+                         (skull_cx - cb_s, skull_cy + int(4 * scale)), 1)
+
+        # === RED FEATHER PLUME (curves upward from right side of hat) ===
         fw = math.sin(t * 4) * 3
-        f_base = (cx + 18, hat_cy)
-        f_mid = (cx + 28 + int(fw), hat_cy - 16)
-        f_tip = (cx + 22 + int(fw * 1.5), hat_cy - 32)
-        pygame.draw.line(head_surf, FEATHER_WHITE, f_base, f_mid, 3)
-        pygame.draw.line(head_surf, FEATHER_WHITE, f_mid, f_tip, 2)
-        pygame.draw.circle(head_surf, FEATHER_WHITE, f_tip, 3)
+        f_base_x = cx + int(18 * scale)
+        f_base_y = hat_cy
+        f_mid_x = f_base_x + int((12 + fw) * scale)
+        f_mid_y = f_base_y - int(18 * scale)
+        f_tip_x = f_base_x + int((8 + fw * 1.5) * scale)
+        f_tip_y = f_base_y - int(35 * scale)
+        # Main plume strokes (multiple for thickness / gradient)
+        pygame.draw.line(head_surf, PLUME_RED, (f_base_x, f_base_y), (f_mid_x, f_mid_y),
+                         max(2, int(4 * scale)))
+        pygame.draw.line(head_surf, PLUME_RED, (f_mid_x, f_mid_y), (f_tip_x, f_tip_y),
+                         max(2, int(3 * scale)))
+        # Lighter center highlight
+        pygame.draw.line(head_surf, PLUME_RED_LIGHT,
+                         (f_base_x + 1, f_base_y), (f_mid_x + 1, f_mid_y),
+                         max(1, int(2 * scale)))
+        pygame.draw.line(head_surf, PLUME_RED_LIGHT,
+                         (f_mid_x + 1, f_mid_y), (f_tip_x + 1, f_tip_y),
+                         max(1, int(1 * scale)))
+        _aa_circle(head_surf, f_tip_x, f_tip_y, max(2, int(3 * scale)), PLUME_RED)
         # Feather barbs
-        for fb in range(4):
-            bp = 0.2 + fb * 0.22
-            bfx = int(f_base[0] + (f_tip[0] - f_base[0]) * bp)
-            bfy = int(f_base[1] + (f_tip[1] - f_base[1]) * bp)
-            pygame.draw.line(head_surf, (245, 240, 235),
-                             (bfx, bfy), (bfx + 5 + int(fw * 0.4), bfy - 5), 1)
+        for fb in range(5):
+            bp = 0.15 + fb * 0.2
+            bfx = int(f_base_x + (f_tip_x - f_base_x) * bp)
+            bfy = int(f_base_y + (f_tip_y - f_base_y) * bp)
+            barb_dir = 1 if fb % 2 == 0 else -1
+            pygame.draw.line(head_surf, PLUME_RED_LIGHT,
+                             (bfx, bfy),
+                             (bfx + int((5 + fw * 0.4) * barb_dir), bfy - int(4 * scale)), 1)
 
-        # --- Emotion overlays ---
+        # === EMOTION OVERLAYS ===
+
+        # Surprised: jagged feather ruffle lines around head
         if self.state == STATE_SURPRISED:
+            for i in range(7):
+                ang = -1.2 + i * 0.4 + math.sin(t * 8) * 0.1
+                r_inner = int(head_r * 1.1)
+                r_outer = int(head_r * 1.3)
+                lx1 = cx + int(math.cos(ang) * r_inner)
+                ly1 = cy + int(math.sin(ang) * r_inner)
+                # Jagged: alternate short and long
+                jag = 8 if i % 2 == 0 else 4
+                lx2 = cx + int(math.cos(ang) * (r_outer + jag))
+                ly2 = cy + int(math.sin(ang) * (r_outer + jag))
+                pygame.draw.line(head_surf, YELLOW, (lx1, ly1), (lx2, ly2), 2)
+
+        # Cheer: golden cross marks orbiting
+        if self.state == STATE_CHEER:
             for i in range(5):
-                ang = -1.0 + i * 0.5 + math.sin(t * 8) * 0.1
-                lx = cx + int(math.cos(ang) * 42)
-                ly = cy + int(math.sin(ang) * 42)
-                lx2 = cx + int(math.cos(ang) * 50)
-                ly2 = cy + int(math.sin(ang) * 50)
-                pygame.draw.line(head_surf, YELLOW, (lx, ly), (lx2, ly2), 3)
+                ang = t * 3.5 + i * 1.26
+                r_orbit = int(head_r * 1.2)
+                sx = cx + int(math.cos(ang) * r_orbit)
+                sy = cy + int(math.sin(ang) * r_orbit)
+                mark_s = int(5 * scale)
+                pygame.draw.line(head_surf, GOLD, (sx - mark_s, sy), (sx + mark_s, sy), 2)
+                pygame.draw.line(head_surf, GOLD, (sx, sy - mark_s), (sx, sy + mark_s), 2)
 
-        if self.state == STATE_CHEER:
-            for i in range(4):
-                ang = t * 3 + i * 1.6
-                sx = cx + int(math.cos(ang) * 46)
-                sy = cy + int(math.sin(ang) * 46)
-                pygame.draw.line(head_surf, GOLD, (sx - 5, sy), (sx + 5, sy), 2)
-                pygame.draw.line(head_surf, GOLD, (sx, sy - 5), (sx, sy + 5), 2)
-
-        # Emotion expressions
+        # Rosy cheeks for laugh & cheer
         if self.state == STATE_LAUGH:
-            # Rosy cheeks
-            pygame.draw.circle(head_surf, (255, 140, 120), (cx - 24, cy + 12), 6)
-
+            _aa_circle(head_surf, cx - int(24 * scale), cy + int(12 * scale),
+                       int(6 * scale), (255, 140, 120))
         if self.state == STATE_CHEER:
-            pygame.draw.circle(head_surf, (255, 160, 140), (cx - 24, cy + 12), 5)
+            _aa_circle(head_surf, cx - int(24 * scale), cy + int(12 * scale),
+                       int(5 * scale), (255, 160, 140))
 
         # Rotate head by tilt and blit
         if abs(tilt) > 0.5:
@@ -746,12 +1176,12 @@ class Virgil:
         rr = rotated_head.get_rect(center=(hx, hy))
         surface.blit(rotated_head, rr)
 
-    # --- Particles ---
+    # === PARTICLES ===
     def _draw_particles(self, surface: pygame.Surface) -> None:
         for p in self._particles:
             p.draw(surface)
 
-    # --- Speech bubble ---
+    # === SPEECH BUBBLE ===
     def _draw_speech_bubble(self, surface: pygame.Surface, x: int, y: int) -> None:
         text = self._speech_display
         if not text:
@@ -802,22 +1232,24 @@ class Virgil:
 
         bubble_rect = pygame.Rect(bx, by, bw, bh)
 
-        # Draw Monkey Island style oval bubble
+        # Monkey Island style oval bubble
         pygame.draw.ellipse(surface, WHITE, bubble_rect.inflate(8, 8))
         pygame.draw.ellipse(surface, BLACK, bubble_rect.inflate(8, 8), width=3)
         pygame.draw.ellipse(surface, WHITE, bubble_rect)
 
-        # Tail points toward Virgil, and flips under the bubble near the top edge.
+        # Tail points toward Virgil
         tail_target_x = int(x - 8) if bubble_left else int(x + 16)
         tail_target_y = int(y - 22) if bubble_above else int(y + 8)
         tail_left = max(bubble_rect.left + 18, min(bubble_rect.right - 18, tail_target_x - 10))
         tail_right = max(bubble_rect.left + 18, min(bubble_rect.right - 18, tail_target_x + 10))
         if bubble_above:
             tail_y = bubble_rect.bottom
-            tail_pts = [(tail_left, tail_y - 4), (tail_target_x, tail_target_y), (tail_right, tail_y - 4)]
+            tail_pts = [(tail_left, tail_y - 4), (tail_target_x, tail_target_y),
+                        (tail_right, tail_y - 4)]
         else:
             tail_y = bubble_rect.top
-            tail_pts = [(tail_left, tail_y + 4), (tail_target_x, tail_target_y), (tail_right, tail_y + 4)]
+            tail_pts = [(tail_left, tail_y + 4), (tail_target_x, tail_target_y),
+                        (tail_right, tail_y + 4)]
         pygame.draw.polygon(surface, WHITE, tail_pts)
         pygame.draw.polygon(surface, BLACK, tail_pts, width=3)
         base_y = tail_y - 2 if bubble_above else tail_y + 2
@@ -832,7 +1264,7 @@ class Virgil:
             surface.blit(base, (lx, ty))
             ty += line_h
 
-    # === PARTICLES ===
+    # === PARTICLE SPAWNERS ===
 
     def _spawn_sparkle_particles(self, count: int = 12) -> None:
         for _ in range(count):
@@ -851,7 +1283,7 @@ class Virgil:
             ))
 
     def _spawn_feather_particles(self, count: int = 8) -> None:
-        feather_colors = [BODY_RED, WING_GREEN, TAIL_BLUE, TAIL_YELLOW, HEAD_RED]
+        feather_colors = [BODY_RED, WING_GREEN, TAIL_BLUE, TAIL_YELLOW, HEAD_RED, PLUME_RED]
         for _ in range(count):
             self._particles.append(_Particle(
                 x=self.x + random.uniform(-30, 30),
@@ -878,4 +1310,11 @@ VIRGIL_WRONG_GUESS_LINES = [
     "Walk the plank with THAT password! Toss in a symbol like @ or # -- arrr!",
     "Squawk! Me grandma's parrot uses stronger passwords -- and she be a GHOST!",
     "Barnacles! A one-legged pirate could hop past that lock! Add more variety!",
+    "Ha! I've seen treasure maps harder to read than THAT password! Spice it up!",
+    "Sweet salty seahorses! That's the code to me birdseed jar, not a TREASURE chest!",
+    "SQUAWK! Even Davy Jones' locker has a better combination -- and he's DEAD!",
+    "Thundering typhoons! A monkey with a keyboard could type that by ACCIDENT!",
+    "Flapping flounders! That password is so short, it fits on a grain of sand!",
+    "Avast! Me eye-patch has more complexity than that! Throw in some chaos, matey!",
+    "Virgil wants a STRONGER password! Mix letters, numbers, AND symbols -- SQUAWK!",
 ]

@@ -125,6 +125,421 @@ class BaseScene:
         virgil.draw(self.game.screen)
 
 
+# ---------------------------------------------------------------------------
+# Studio Intro — cinematic "V Studios" splash screen
+# ---------------------------------------------------------------------------
+
+class StudioIntroScene(BaseScene):
+    """Cinematic V Studios splash (~9 s). Skippable after 2 s."""
+
+    # === EASY TO CHANGE COLORS / DURATION ===
+    DEEP_BLUE = (10, 20, 50)
+    GOLD_BRIGHT = (255, 200, 50)
+    GOLD_MID = (200, 150, 30)
+    GOLD_DIM = (140, 100, 20)
+    PARCHMENT = (235, 220, 180)
+    DURATION = 9.0
+    SKIP_AFTER = 2.0
+
+    def __init__(self, game):
+        super().__init__(game)
+        self.elapsed = 0.0
+        self.particles: list = []
+        self._skipped = False
+        self._done = False
+
+        # Pre-built surfaces (created in enter)
+        self._vignette_surf: pygame.Surface | None = None
+        self._parchment_surf: pygame.Surface | None = None
+
+        # Compass "V" emblem
+        self._v_lines: list[tuple] = []
+        self._v_reveal = 0.0
+
+        # STUDIOS per-letter animation
+        self._studios_letters: list[dict] = []
+
+        # Tagline state
+        self._tagline_y = HEIGHT + 50
+        self._tagline_alpha = 0
+
+        # Glow pulse
+        self._glow_alpha = 0
+
+        # Letterbox
+        self._letterbox_h = 0
+
+        # SFX one-shot flags
+        self._played_ocean = False
+        self._played_sparkle = False
+        self._played_cannon = False
+
+    # ------------------------------------------------------------------
+    # enter
+    # ------------------------------------------------------------------
+    def enter(self, payload=None):
+        super().enter(payload)
+        self.elapsed = 0.0
+        self._skipped = False
+        self._done = False
+        self.particles = []
+        self._letterbox_h = 0
+        self._tagline_alpha = 0
+        self._tagline_y = HEIGHT + 50
+        self._glow_alpha = 0
+        self._v_reveal = 0.0
+        self._played_ocean = False
+        self._played_sparkle = False
+        self._played_cannon = False
+
+        # Suppress the game's standard fade-in; we do our own fade from black
+        self.game._fade_alpha = 0
+        self.game._fade_direction = 0
+
+        self._build_vignette()
+        self._build_parchment()
+        self._build_compass_lines()
+        self._init_studios_letters()
+
+        # Stop game music during splash
+        self.game.audio.stop_music()
+
+    # ------------------------------------------------------------------
+    # Asset builders (called once in enter)
+    # ------------------------------------------------------------------
+    def _build_vignette(self):
+        surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        cx, cy = WIDTH // 2, HEIGHT // 2
+        for i in range(40):
+            alpha = int(160 * ((40 - i) / 40) ** 1.5)
+            w = WIDTH - i * 10
+            h = HEIGHT - i * 7
+            if w <= 0 or h <= 0:
+                break
+            rect = pygame.Rect(0, 0, w, h)
+            rect.center = (cx, cy)
+            pygame.draw.ellipse(surf, (0, 0, 0, max(0, min(255, alpha))), rect,
+                                width=max(6, 12 - i // 4))
+        self._vignette_surf = surf
+
+    def _build_parchment(self):
+        surf = pygame.Surface((WIDTH, HEIGHT))
+        surf.fill(self.PARCHMENT)
+        for _ in range(200):
+            x = random.randint(0, WIDTH)
+            y = random.randint(0, HEIGHT)
+            shade = random.randint(200, 230)
+            pygame.draw.circle(surf, (shade, shade - 15, shade - 45), (x, y),
+                               random.randint(2, 8))
+        self._parchment_surf = surf
+
+    def _build_compass_lines(self):
+        cx, cy = WIDTH // 2, 220
+        self._v_lines = [
+            # Decorative compass cross (thinner, drawn first)
+            ((cx, cy - 70), (cx, cy + 70)),
+            ((cx - 70, cy), (cx + 70, cy)),
+            ((cx - 40, cy - 40), (cx + 40, cy + 40)),
+            ((cx + 40, cy - 40), (cx - 40, cy + 40)),
+            # Main "V" strokes (thick, drawn last / on top)
+            ((cx - 80, cy - 80), (cx, cy + 60)),
+            ((cx + 80, cy - 80), (cx, cy + 60)),
+        ]
+
+    def _init_studios_letters(self):
+        font = self.game.fonts.huge
+        text = "STUDIOS"
+        widths = [font.size(c)[0] for c in text]
+        total_w = sum(widths)
+        start_x = (WIDTH - total_w) // 2
+        self._studios_letters = []
+        x_cursor = start_x
+        for i, ch in enumerate(text):
+            cw = widths[i]
+            self._studios_letters.append({
+                "char": ch,
+                "target_x": x_cursor + cw // 2,
+                "target_y": 320,
+                "start_y": -60 - i * 30,
+                "current_y": -60 - i * 30,
+                "scale": 2.5,
+                "alpha": 0,
+                "arrived": False,
+            })
+            x_cursor += cw
+
+    # ------------------------------------------------------------------
+    # handle_event — skip after SKIP_AFTER seconds
+    # ------------------------------------------------------------------
+    def handle_event(self, event):
+        if self.elapsed < self.SKIP_AFTER:
+            return
+        if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
+            self._skipped = True
+
+    # ------------------------------------------------------------------
+    # update — main animation timeline
+    # ------------------------------------------------------------------
+    def update(self, dt):
+        self.elapsed += dt
+        t = self.elapsed
+
+        # Transition out
+        if (self._skipped or t >= self.DURATION) and not self._done:
+            self._done = True
+            self.game.audio.play_music()
+            if self.game.presentation and self.game.presentation.active:
+                self.completed = True
+            else:
+                self.game.switch_scene("voyage_intro")
+            return
+
+        # === CINEMATIC TIMING ===
+
+        # Phase 1 (0–1.5 s): vortex particles + ocean ambience
+        if t < 1.5:
+            self._spawn_vortex_particles(dt)
+            # SOUND PLACEHOLDERS
+            if not self._played_ocean:
+                self._played_ocean = True
+                self.game.audio.play_sfx("ocean_ambience")
+
+        # Phase 2 (1.5–3 s): compass "V" reveal
+        if 1.5 <= t < 3.0:
+            self._v_reveal = min(1.0, (t - 1.5) / 1.3)
+            if t >= 2.5:
+                self._spawn_sparkle_burst(dt)
+            if not self._played_sparkle and t >= 2.8:
+                self._played_sparkle = True
+                self.game.audio.play_sfx("sparkle")
+
+        # Phase 3 (3–5 s): STUDIOS snap-in + golden rain
+        if 3.0 <= t < 5.0:
+            if not self._played_cannon:
+                self._played_cannon = True
+                self.game.audio.play_sfx("cannon_boom")
+            progress = min(1.0, (t - 3.0) / 1.6)
+            self._update_studios_letters(progress)
+            self._spawn_golden_rain(dt)
+
+        # Phase 4 (5–7 s): tagline + glow pulse
+        if 5.0 <= t < 7.0:
+            tag_p = min(1.0, (t - 5.0) / 1.0)
+            ease = 1.0 - (1.0 - tag_p) ** 3
+            self._tagline_y = int(420 - ease * 40)
+            self._tagline_alpha = min(255, int(255 * tag_p))
+            pulse = math.sin((t - 5.0) * math.pi)
+            self._glow_alpha = int(60 * max(0.0, pulse))
+        else:
+            self._glow_alpha = 0
+
+        # Phase 5 (7–9 s): letterbox bars
+        if t >= 7.0:
+            bar_p = min(1.0, (t - 7.0) / 0.5)
+            self._letterbox_h = int(40 * bar_p)
+
+        # Update particles
+        alive = []
+        for p in self.particles:
+            p.update(dt)
+            if p.alive():
+                alive.append(p)
+        self.particles = alive
+
+    # ------------------------------------------------------------------
+    # Particle spawners
+    # ------------------------------------------------------------------
+    def _spawn_vortex_particles(self, dt):
+        cx, cy = WIDTH // 2, HEIGHT // 2
+        count = int(60 * dt)
+        for _ in range(max(1, count)):
+            angle = random.uniform(0, math.tau)
+            dist = random.uniform(200, 400)
+            x = cx + math.cos(angle) * dist
+            y = cy + math.sin(angle) * dist
+            speed = random.uniform(80, 160)
+            to_center = math.atan2(cy - y, cx - x)
+            tangent = to_center + random.uniform(-0.5, 0.5)
+            self.particles.append(Particle(
+                x=x, y=y,
+                vx=math.cos(tangent) * speed,
+                vy=math.sin(tangent) * speed,
+                size=random.uniform(1.5, 4),
+                life=random.uniform(0.8, 1.5),
+                max_life=1.5,
+                color=random.choice([self.GOLD_BRIGHT, self.GOLD_MID, (255, 230, 120)]),
+            ))
+
+    def _spawn_sparkle_burst(self, dt):
+        cx, cy = WIDTH // 2, 220
+        count = int(30 * dt)
+        for _ in range(max(1, count)):
+            angle = random.uniform(0, math.tau)
+            speed = random.uniform(40, 120)
+            self.particles.append(Particle(
+                x=cx, y=cy,
+                vx=math.cos(angle) * speed,
+                vy=math.sin(angle) * speed,
+                size=random.uniform(2, 5),
+                life=random.uniform(0.5, 1.2),
+                max_life=1.2,
+                color=(255, 255, 200),
+            ))
+
+    def _spawn_golden_rain(self, dt):
+        count = int(15 * dt)
+        for _ in range(max(1, count)):
+            self.particles.append(Particle(
+                x=random.uniform(50, WIDTH - 50),
+                y=random.uniform(-10, 0),
+                vx=random.uniform(-10, 10),
+                vy=random.uniform(60, 140),
+                size=random.uniform(1, 3),
+                life=random.uniform(2.0, 4.0),
+                max_life=4.0,
+                color=random.choice([self.GOLD_BRIGHT, self.GOLD_MID]),
+                gravity=20,
+            ))
+
+    # ------------------------------------------------------------------
+    # STUDIOS letter animation
+    # ------------------------------------------------------------------
+    def _update_studios_letters(self, progress):
+        n = len(self._studios_letters)
+        for i, letter in enumerate(self._studios_letters):
+            trigger = i / n
+            if progress < trigger:
+                continue
+            local_p = min(1.0, (progress - trigger) * n)
+            ease = 1.0 - (1.0 - local_p) ** 3
+            letter["current_y"] = int(letter["start_y"] + (letter["target_y"] - letter["start_y"]) * ease)
+            letter["scale"] = 2.5 + (1.0 - 2.5) * ease
+            letter["alpha"] = min(255, int(255 * ease))
+            if local_p >= 1.0:
+                letter["arrived"] = True
+                letter["current_y"] = letter["target_y"]
+                letter["scale"] = 1.0
+                letter["alpha"] = 255
+
+    # ------------------------------------------------------------------
+    # draw
+    # ------------------------------------------------------------------
+    def draw(self, screen):
+        t = self.elapsed
+
+        # Background: fade from black → deep blue → parchment
+        if t < 1.5:
+            fade_in = min(1.0, t / 1.5)
+            bg = tuple(int(c * fade_in) for c in self.DEEP_BLUE)
+            screen.fill(bg)
+        elif t < 3.0:
+            screen.fill(self.DEEP_BLUE)
+            blend = min(1.0, (t - 1.5) / 1.5)
+            self._parchment_surf.set_alpha(int(255 * blend))
+            screen.blit(self._parchment_surf, (0, 0))
+        else:
+            self._parchment_surf.set_alpha(255)
+            screen.blit(self._parchment_surf, (0, 0))
+
+        # Glow pulse behind emblem (phase 4)
+        if self._glow_alpha > 0:
+            glow_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (*self.GOLD_BRIGHT, self._glow_alpha),
+                               (WIDTH // 2, 260), 160)
+            screen.blit(glow_surf, (0, 0))
+
+        # Particles
+        for p in self.particles:
+            p.draw(screen)
+
+        # Compass "V" emblem (phase 2+)
+        if t >= 1.5:
+            self._draw_compass_v(screen)
+
+        # STUDIOS letters (phase 3+)
+        if t >= 3.0:
+            self._draw_studios(screen)
+
+        # Tagline (phase 4+)
+        if t >= 5.0 and self._tagline_alpha > 0:
+            self._draw_tagline(screen)
+
+        # "presents" text during final phase
+        if t >= 7.5:
+            presents_alpha = min(180, int(180 * min(1.0, (t - 7.5) / 0.5)))
+            presents_surf = self.game.fonts.tiny.render("presents", True, self.GOLD_DIM)
+            presents_surf.set_alpha(presents_alpha)
+            pr = presents_surf.get_rect(center=(WIDTH // 2, 450))
+            screen.blit(presents_surf, pr)
+
+        # Vignette overlay
+        if self._vignette_surf:
+            screen.blit(self._vignette_surf, (0, 0))
+
+        # Letterbox bars (phase 5)
+        if self._letterbox_h > 0:
+            pygame.draw.rect(screen, (0, 0, 0), (0, 0, WIDTH, self._letterbox_h))
+            pygame.draw.rect(screen, (0, 0, 0),
+                             (0, HEIGHT - self._letterbox_h, WIDTH, self._letterbox_h))
+
+        # Skip hint
+        if t >= self.SKIP_AFTER:
+            draw_text_outline(screen, "Press any key to skip",
+                              self.game.fonts.tiny, (200, 200, 200), (0, 0, 0),
+                              (WIDTH // 2, HEIGHT - 30 - self._letterbox_h), center=True)
+
+    # ------------------------------------------------------------------
+    # Draw helpers
+    # ------------------------------------------------------------------
+    def _draw_compass_v(self, screen):
+        cx, cy = WIDTH // 2, 220
+        reveal = self._v_reveal
+
+        # Compass ring
+        if reveal > 0.1:
+            pygame.draw.circle(screen, self.GOLD_BRIGHT, (cx, cy), 90, width=3)
+
+        # Line segments with progressive reveal
+        n = len(self._v_lines)
+        for i, (start, end) in enumerate(self._v_lines):
+            line_start = i / n
+            line_progress = max(0.0, min(1.0, (reveal - line_start) * n))
+            if line_progress <= 0:
+                continue
+            ex = int(start[0] + (end[0] - start[0]) * line_progress)
+            ey = int(start[1] + (end[1] - start[1]) * line_progress)
+            width = 5 if i >= 4 else 2  # Last two are the main V strokes
+            pygame.draw.line(screen, self.GOLD_BRIGHT, start, (ex, ey), width)
+
+        # Decorative dots at compass points
+        if reveal > 0.8:
+            for angle_deg in range(0, 360, 45):
+                ang = math.radians(angle_deg)
+                px = int(cx + math.cos(ang) * 90)
+                py = int(cy + math.sin(ang) * 90)
+                pygame.draw.circle(screen, self.GOLD_MID, (px, py), 4)
+
+    def _draw_studios(self, screen):
+        font = self.game.fonts.huge
+        for letter in self._studios_letters:
+            if letter["alpha"] <= 0:
+                continue
+            char_surf = font.render(letter["char"], True, self.GOLD_BRIGHT)
+            if letter["scale"] != 1.0:
+                sw = max(1, int(char_surf.get_width() * letter["scale"]))
+                sh = max(1, int(char_surf.get_height() * letter["scale"]))
+                char_surf = pygame.transform.smoothscale(char_surf, (sw, sh))
+            char_surf.set_alpha(letter["alpha"])
+            rect = char_surf.get_rect(center=(letter["target_x"], letter["current_y"]))
+            screen.blit(char_surf, rect)
+
+    def _draw_tagline(self, screen):
+        tag_surf = self.game.fonts.small.render("Where Learning Sets Sail!", True, self.GOLD_DIM)
+        tag_surf.set_alpha(self._tagline_alpha)
+        rect = tag_surf.get_rect(center=(WIDTH // 2, self._tagline_y))
+        screen.blit(tag_surf, rect)
+
+
 class VoyageIntroScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
@@ -913,7 +1328,7 @@ class VoyageIntroScene(BaseScene):
         # Compact header bar with title + progress
         title_panel = pygame.Rect(140, 8, 620, 52)
         draw_panel(screen, title_panel, bg_color=(78, 52, 32), border_color=(184, 143, 88))
-        draw_text_outline(screen, "Voyage To Password Island", self.game.fonts.small, (245, 213, 133), BLACK, (450, 34), center=True)
+        draw_text_outline(screen, "Voyage To Secure Island", self.game.fonts.small, (245, 213, 133), BLACK, (450, 34), center=True)
 
         # Progress bar instead of text — positioned at bottom of title panel
         progress_pct = int(self.progress * 100)

@@ -21,6 +21,7 @@ from .scenes import (
     LandingScene,
     LessonScene,
     ParentReportScene,
+    StudioIntroScene,
     VoyageIntroScene,
 )
 from .ui import FontBook, draw_dialogue_panel, draw_text_outline
@@ -97,7 +98,8 @@ class PiratePasswordGame:
         if self.presentation and self.presentation.active:
             self.presentation.start(self)
         else:
-            self.switch_scene("voyage_intro")
+            self.audio.stop_music()
+            self.switch_scene("studio_intro")
 
     def _apply_display_mode(self, fullscreen: bool):
         self.fullscreen = bool(fullscreen)
@@ -171,7 +173,9 @@ class PiratePasswordGame:
         self._do_switch_scene(name, payload)
 
     def _do_switch_scene(self, name, payload=None):
-        if name == "voyage_intro":
+        if name == "studio_intro":
+            self.current_scene = StudioIntroScene(self)
+        elif name == "voyage_intro":
             self.current_scene = VoyageIntroScene(self)
         elif name == "landing":
             self.current_scene = LandingScene(self)
