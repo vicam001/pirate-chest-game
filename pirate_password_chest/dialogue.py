@@ -162,7 +162,6 @@ LESSON_DIALOGUE = DialogueSequence([
     DialogueLine("virgil", "Time for Captain's class! Listen up, crew!", "excited"),
     DialogueLine("captain", "Rule 1: Longer passwords = stronger locks. More combinations to guess!", "happy"),
     DialogueLine("captain", "Rule 2: Mix letters, numbers, AND symbols. Like a secret pirate recipe!", "happy"),
-    DialogueLine("gibbs", "I used 'password123'... and look at me now. GHOST!", "silly"),
     DialogueLine("captain", "Rule 3: NEVER share your password. Not even with best friends.", "happy"),
     DialogueLine("virgil", "Only trusted grown-ups like your parents. Got it? SQUAWK!", "excited"),
 ])

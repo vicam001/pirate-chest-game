@@ -20,6 +20,7 @@ from .scenes import (
     FinaleScene,
     LandingScene,
     LessonScene,
+    PasswordChallengeScene,
     ParentReportScene,
     StudioIntroScene,
     VoyageIntroScene,
@@ -173,6 +174,7 @@ class PiratePasswordGame:
         self._do_switch_scene(name, payload)
 
     def _do_switch_scene(self, name, payload=None):
+        self.scroll.collapsed = False  # each scene starts with full scroll
         if name == "studio_intro":
             self.current_scene = StudioIntroScene(self)
         elif name == "voyage_intro":
@@ -184,7 +186,7 @@ class PiratePasswordGame:
         elif name == "lesson":
             self.current_scene = LessonScene(self)
         elif name == "builder":
-            self.current_scene = BuilderScene(self)
+            self.current_scene = PasswordChallengeScene(self)
         elif name == "parent_report":
             self.current_scene = ParentReportScene(self)
         elif name == "finale":

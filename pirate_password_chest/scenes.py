@@ -201,8 +201,9 @@ class StudioIntroScene(BaseScene):
         self._build_compass_lines()
         self._init_studios_letters()
 
-        # Stop game music during splash
+        # Stop game music and play cinematic intro theme
         self.game.audio.stop_music()
+        self.game.audio.play_intro_music()
 
     # ------------------------------------------------------------------
     # Asset builders (called once in enter)
@@ -287,6 +288,7 @@ class StudioIntroScene(BaseScene):
         # Transition out
         if (self._skipped or t >= self.DURATION) and not self._done:
             self._done = True
+            self.game.audio.stop_intro_music()
             self.game.audio.play_music()
             if self.game.presentation and self.game.presentation.active:
                 self.completed = True
@@ -581,19 +583,8 @@ class VoyageIntroScene(BaseScene):
                 "best": 0,
                 "character": "nina",
             },
-            {
+                        {
                 "trigger": 0.50,
-                "question": "Which password is harder for pirates to crack?",
-                "choices": ("Sun$et#42!", "Pepito"),
-                "responses": (
-                    "Aye! Mix letters, numbers and symbols for super-strong passwords!",
-                    "Too easy! Always mix letters, numbers AND symbols!",
-                ),
-                "best": 0,
-                "character": "captain",
-            },
-            {
-                "trigger": 0.78,
                 "question": "Someone asks for your address. What do you do?",
                 "choices": ("KEEP SECRET!", "TELL THEM"),
                 "responses": (
@@ -603,6 +594,17 @@ class VoyageIntroScene(BaseScene):
                 "best": 0,
                 "character": "gibbs",
             },
+            {
+                "trigger": 0.78,
+                "question": "Which password is harder for pirates to crack?",
+                "choices": ("Sun$et#42!", "Virgil"),
+                "responses": (
+                    "Aye! Mix letters, numbers and symbols for super-strong passwords!",
+                    "Too easy! Always mix letters, numbers AND symbols!",
+                ),
+                "best": 0,
+                "character": "captain",
+            }
         ]
 
         self.progress = 0.0
@@ -2204,14 +2206,32 @@ class CrackScene(BaseScene):
 
 
 class LessonScene(BaseScene):
+    # Lesson cards: (character_id, text, background_color)
+    _LESSONS = [
+        ("captain", "Longer passwords are harder to crack!",      (52, 118, 52)),
+        ("captain", "Mix LETTERS + NUMBERS + SYMBOLS!",           (52, 118, 52)),
+        ("captain", "NEVER share your password!",                  (52, 118, 52)),
+        ("virgil",  "Only share with parents.  SQUAWK!",          (40, 118, 62)),
+    ]
+
     def __init__(self, game):
         super().__init__(game)
-        self.to_builder_button = Button((90, 400, 340, 40), "BUILD PASSWORD", (84, 190, 96), (110, 214, 122), pulse=False)
-        self.play_again_button = Button((470, 400, 340, 40), "PLAY AGAIN", (255, 172, 50), (255, 196, 80), pulse=False)
+        # Taller buttons — moved lower now that the scroll panel is collapsed.
+        # font_attr="small" (34 px) keeps the labels within the 296 px width.
+        self.to_builder_button = Button(
+            (52, 464, 296, 58), "BUILD PASSWORD",
+            (84, 190, 96), (110, 214, 122), pulse=False, font_attr="small")
+        self.play_again_button = Button(
+            (392, 464, 296, 58), "PLAY AGAIN",
+            (255, 172, 50), (255, 196, 80), pulse=False, font_attr="small")
 
     def enter(self, payload=None):
         self.completed = False
-        self.scroll_message("Remember the golden rules of password safety!", "teaching")
+        # Collapse the scroll panel so lesson content has full vertical room.
+        # game._do_switch_scene() restores it automatically when leaving.
+        self.game.scroll.collapsed = True
+        self.scroll_message(
+            "Remember the golden rules of password safety!", "teaching")
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2228,74 +2248,88 @@ class LessonScene(BaseScene):
         t = pygame.time.get_ticks() / 1000.0
         self.draw_world(t)
 
-        screen.blit(self.game._get_overlay_surface((8, 20, 38), 170), (0, 0))
+        # Dim the world so the panel pops
+        screen.blit(self.game._get_overlay_surface((8, 20, 38), 160), (0, 0))
 
-        panel = pygame.Rect(30, 30, 840, 410)
+        # ── Main panel — taller now that the scroll is collapsed ──────────
+        panel = pygame.Rect(24, 20, 740, 536)
         draw_panel(screen, panel)
 
-        # Title and stars on the same line
+        # ── Title ─────────────────────────────────────────────────────────
+        draw_text_outline(screen, "What We Learned!",
+                          self.game.fonts.med, RED, BLACK,
+                          (panel.centerx, panel.top + 38), center=True)
+
+        # ── Stars row (shown only when earned) ────────────────────────────
         result = self.game.last_round_result or {}
         stars = result.get("stars_awarded", 0)
-        title_str = "What We Learned!"
+        title_y2 = panel.top + 72
         if stars > 0:
-            star_text = " ".join("*" for _ in range(stars))
-            title_str += f"  Stars: {star_text}"
-        draw_text_outline(screen, title_str, self.game.fonts.small, RED, BLACK,
-                          (panel.centerx, panel.top + 32), center=True)
+            star_str = "  ".join("*" * stars)  # asterisks — Comic Sans lacks U+2605
+            draw_text_outline(screen, star_str,
+                              self.game.fonts.small, GOLD, BLACK,
+                              (panel.centerx, title_y2), center=True)
 
-        # Lesson cards — each is a small panel with portrait + text
-        lessons = [
-            ("captain", "Longer passwords are harder to crack!", (60, 130, 60)),
-            ("captain", "Mix LETTERS + NUMBERS + SYMBOLS!", (60, 130, 60)),
-            ("gibbs", "I used 'password123'... now I am a GHOST!", (120, 80, 80)),
-            ("captain", "NEVER share your password!", (60, 130, 60)),
-            ("virgil", "Only share with parents. SQUAWK!", (50, 140, 70)),
-        ]
+        # ── Lesson cards ──────────────────────────────────────────────────
+        card_x   = panel.left + 16
+        card_w   = panel.width - 32
+        card_h   = 50
+        card_gap = 5
+        y_start  = panel.top + (88 if stars > 0 else 72)
 
-        card_x = panel.left + 18
-        card_w = panel.width - 36
-        card_h = 48
-        card_gap = 6
-        y_start = panel.top + 60
-
-        for idx, (char_id, text, card_tint) in enumerate(lessons):
+        for idx, (char_id, text, card_color) in enumerate(self._LESSONS):
             cy = y_start + idx * (card_h + card_gap)
-
-            # Card background
             card_rect = pygame.Rect(card_x, cy, card_w, card_h)
-            pygame.draw.rect(screen, card_tint, card_rect, border_radius=14)
-            pygame.draw.rect(screen, (40, 30, 20), card_rect, width=2, border_radius=14)
 
-            # Portrait on left
-            portrait_cx = card_x + 28
-            portrait_cy = cy + card_h // 2
-            self.draw_character_portrait(char_id, (portrait_cx, portrait_cy), 30)
+            # Card body + subtle border
+            pygame.draw.rect(screen, card_color, card_rect, border_radius=12)
+            pygame.draw.rect(screen, (30, 22, 14), card_rect,
+                             width=2, border_radius=12)
 
-            # Text — use tiny font and wrap within card width
-            text_x = card_x + 52
-            text_max_w = card_w - 70
-            lines = wrap_text(text, self.game.fonts.tiny, text_max_w)
+            # Character portrait (32 px, vertically centered)
+            self.draw_character_portrait(
+                char_id, (card_x + 26, cy + card_h // 2), 32)
+
+            # Lesson text, vertically centered in card
+            lines = wrap_text(text, self.game.fonts.tiny, card_w - 68)
             if len(lines) == 1:
-                draw_text_outline(screen, lines[0], self.game.fonts.tiny, WHITE, BLACK,
-                                  (text_x, cy + card_h // 2 - 2), center=False)
+                draw_text_outline(screen, lines[0], self.game.fonts.tiny,
+                                  WHITE, BLACK,
+                                  (card_x + 56, cy + card_h // 2 - 1),
+                                  center=False)
             else:
+                line_h = self.game.fonts.tiny.get_height() + 2
+                block_top = cy + (card_h - len(lines[:2]) * line_h) // 2
                 for li, line in enumerate(lines[:2]):
-                    draw_text_outline(screen, line, self.game.fonts.tiny, WHITE, BLACK,
-                                      (text_x, cy + 12 + li * 20), center=False)
+                    draw_text_outline(screen, line, self.game.fonts.tiny,
+                                      WHITE, BLACK,
+                                      (card_x + 56, block_top + li * line_h),
+                                      center=False)
 
-        # Example password
-        example_y = y_start + len(lessons) * (card_h + card_gap) + 12
-        draw_text_outline(screen, "Strong example:", self.game.fonts.tiny, BLACK, YELLOW,
-                          (panel.centerx - 60, example_y), center=True)
-        draw_text_outline(screen, "C@pt@in$tar42!", self.game.fonts.small, DARK_BLUE, BLACK,
-                          (panel.centerx + 100, example_y), center=True)
+        # ── Example password box ──────────────────────────────────────────
+        example_y = y_start + len(self._LESSONS) * (card_h + card_gap) + 8
+        ex_rect = pygame.Rect(card_x, example_y, card_w, 44)
+        pygame.draw.rect(screen, DARK_BLUE, ex_rect, border_radius=12)
+        pygame.draw.rect(screen, GOLD, ex_rect, width=2, border_radius=12)
 
-        # Buttons
+        draw_text_outline(screen, "Strong example:",
+                          self.game.fonts.tiny, GOLD, BLACK,
+                          (card_x + 100, ex_rect.centery), center=True)
+        draw_text_outline(screen, "C@pt@in$tar42!",
+                          self.game.fonts.small, CYAN, BLACK,
+                          (card_x + 490, ex_rect.centery), center=True)
+
+        # ── Action buttons ────────────────────────────────────────────────
         if not self.is_presentation:
-            self.to_builder_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
-            self.play_again_button.draw(screen, self.game.fonts, t, mouse_pos=self.game.mouse_virtual_pos)
+            self.to_builder_button.draw(
+                screen, self.game.fonts, t,
+                mouse_pos=self.game.mouse_virtual_pos)
+            self.play_again_button.draw(
+                screen, self.game.fonts, t,
+                mouse_pos=self.game.mouse_virtual_pos)
 
-        self.draw_scene_virgil(820, 360)
+        # ── Virgil — outside the panel on the right ───────────────────────
+        self.draw_scene_virgil(830, 340)
 
 
 class BuilderScene(BaseScene):
@@ -2560,6 +2594,939 @@ class BuilderScene(BaseScene):
 
         self.draw_particles(self.sparkles)
         self.draw_particles(self.confetti)
+
+
+# ---------------------------------------------------------------------------
+# _PlayerEntry — record for one participant in the Password Crew Challenge
+# ---------------------------------------------------------------------------
+
+class _PlayerEntry:
+    __slots__ = ("name", "password", "strength", "submitted")
+
+    def __init__(self, name: str):
+        self.name = name
+        self.password = ""
+        self.strength = 0
+        self.submitted = False
+
+
+# ---------------------------------------------------------------------------
+# PasswordChallengeScene — "The Password Crew Challenge"
+#
+# Multi-player tournament where an instructor guides each child one-by-one to
+# build the strongest password.  Replaces the old single-player BuilderScene.
+#
+# Sub-states:
+#   "intro"        — Virgil fly-in + opening speech; click/key to proceed
+#   "building"     — active password building for the selected player
+#   "done_reaction"— brief Virgil reaction (2–3 s) after a player submits
+#   "leaderboard"  — ranked final display with medals and winner CTA
+# ---------------------------------------------------------------------------
+
+class PasswordChallengeScene(BaseScene):
+
+    # ── VIRGIL TEACHING LINES ─────────────────────────────────────────────
+    _VIRGIL_INTRO = (
+        "Arrr, mateys!  Let's build the strongest passwords in the seven seas!  "
+        "Instructor, pick a pirate on the left and type their password!"
+    )
+    _VIRGIL_TIPS = [
+        "A longer password be like a bigger cannon — more firepower!",
+        "Letters alone won't fool a pirate!  Mix in numbers and symbols!",
+        "Ahoy!  Using yer birthday?  Even me grandma parrot knows that trick!",
+        "More characters means more treasure-proof — keep building, matey!",
+        "Numbers hidden among letters confuse every pirate code-breaker!",
+        "Mix upper AND lower case letters — pirates are unpredictable!",
+        "Symbols are like secret sauce on a treasure map — use 'em!",
+        "A password nobody can guess — not even yer first mate — THAT be the goal!",
+        "ARRR!  That password could hold off the whole Royal Navy!  SQUAWK!",
+        "Every extra character makes it a thousand times harder to crack!",
+    ]
+    _VIRGIL_WEAK = [
+        "Shiver me timbers — this password be weak as a soggy biscuit!",
+        "Arrr… a real pirate would crack this in under a minute!",
+        "Even Davy Jones could guess THAT one, matey!",
+    ]
+    _VIRGIL_STRONG = [
+        "ARRR!  That password could hold off the whole Royal Navy!  SQUAWK!",
+        "Shiver me treasure — nobody's cracking THAT chest!",
+        "Captain-grade security!  Ye be a true password pirate!",
+    ]
+
+    # ── COLORS ────────────────────────────────────────────────────────────
+    PARCHMENT_BG     = (235, 218, 175)
+    PARCHMENT_LINE   = (196, 175, 130)
+    PARCHMENT_BORDER = (130, 90, 45)
+    SLOT_ACTIVE      = (255, 220, 100)
+    SLOT_DONE        = (100, 200, 110)
+    SLOT_IDLE        = (180, 148, 95)
+    MEDAL_GOLD       = (255, 200, 40)
+    MEDAL_SILVER     = (200, 200, 210)
+    MEDAL_BRONZE     = (196, 128, 60)
+
+    # ── LAYOUT ────────────────────────────────────────────────────────────
+    LEFT_W   = 162   # player list panel width
+    PARCH_X  = 170   # parchment left edge
+    PARCH_Y  = 88    # parchment top edge
+    PARCH_W  = 512   # parchment width
+    PARCH_H  = 330   # parchment height
+    PWD_BOX_Y = 98   # password display box top
+    PWD_BOX_H = 80   # password display box height
+    BAR_Y    = 200   # strength bar top
+    BAR_H    = 40    # strength bar height
+    TIP_Y    = 262   # tooltip text y
+    ACT_Y    = 500   # action bar y
+    MAX_PLAYERS = 5
+
+    def __init__(self, game):
+        super().__init__(game)
+
+        self._players: list = []
+        self._active_idx: int | None = None
+        self._rename_idx: int | None = None
+        self._rename_text: str = ""
+
+        self._sub = "intro"
+        self._reaction_timer = 0.0
+        self._lb_enter_time = 0.0
+        self._ranked: list = []
+
+        # per-char ink animation: list of [char, age_seconds]
+        self._ink_chars: list = []
+
+        self._sparkles: list = []
+        self._confetti: list = []
+        self._milestones: set = set()
+        self._confetti_done = False
+
+        self._parchment: pygame.Surface | None = None
+
+        # ── Back to menu button ────────────────────────────────────────────
+        self._btn_menu = Button(
+            (4, 4, 110, 42), "\u2190 MENU",
+            (100, 75, 40), (140, 105, 60), pulse=False, font_attr="tiny")
+
+        # ── Category buttons (right panel) ────────────────────────────────
+        self._btn_letter = Button(
+            (700, 110, 180, 78), "ADD LETTER",
+            (78, 139, 255), (110, 168, 255), font_attr="small")
+        self._btn_number = Button(
+            (700, 202, 180, 78), "ADD NUMBER",
+            (80, 196, 107), (111, 214, 130), font_attr="small")
+        self._btn_symbol = Button(
+            (700, 294, 180, 78), "ADD SYMBOL",
+            (255, 146, 68), (255, 178, 110), font_attr="small")
+
+        # ── Action bar buttons ────────────────────────────────────────────
+        self._btn_undo  = Button(
+            (172, 500, 145, 52), "UNDO",
+            (204, 96, 72), (226, 119, 92), pulse=False)
+        self._btn_clear = Button(
+            (330, 500, 160, 52), "CLEAR",
+            (148, 94, 206), (170, 115, 224), pulse=False)
+        self._btn_done  = Button(
+            (508, 500, 165, 52), "DONE",
+            (252, 170, 35), (255, 196, 80))
+        self._btn_end   = Button(
+            (690, 500, 185, 52), "END CHALLENGE",
+            (180, 60, 60), (210, 80, 80), pulse=False)
+
+        # ── Leaderboard buttons ───────────────────────────────────────────
+        self._btn_next  = Button(
+            (476, 488, 388, 68), "Start Next Level  \u2192",
+            (80, 196, 107), (111, 214, 130))
+        self._btn_again = Button(
+            (36, 488, 225, 68), "Play Again",
+            (78, 139, 255), (110, 168, 255), pulse=False)
+
+    # ======================================================================
+    # ENTER
+    # ======================================================================
+    def enter(self, payload=None):
+        super().enter(payload)
+        self._players = [
+            _PlayerEntry("Pirate 1"),
+            _PlayerEntry("Pirate 2"),
+            _PlayerEntry("Pirate 3"),
+        ]
+        self._active_idx = None
+        self._rename_idx = None
+        self._rename_text = ""
+        self._sub = "intro"
+        self._reaction_timer = 0.0
+        self._ranked = []
+        self._ink_chars.clear()
+        self._sparkles.clear()
+        self._confetti.clear()
+        self._milestones.clear()
+        self._confetti_done = False
+        self._parchment = self._build_parchment()
+
+        virgil = self.game.virgil
+        virgil.fly_in(land_x=840, land_y=380)
+        virgil.talk(self._VIRGIL_INTRO, duration_seconds=6.0)
+        self.scroll_message(self._VIRGIL_INTRO, "dialogue")
+
+    # ======================================================================
+    # PARCHMENT (pre-rendered once per scene enter)
+    # ======================================================================
+    def _build_parchment(self) -> pygame.Surface:
+        surf = pygame.Surface((self.PARCH_W, self.PARCH_H), pygame.SRCALPHA)
+        surf.fill(self.PARCHMENT_BG)
+        # Aged horizontal lines
+        for row in range(7):
+            y = 28 + row * 44
+            pygame.draw.line(surf, self.PARCHMENT_LINE,
+                             (12, y), (self.PARCH_W - 12, y), 1)
+        # Border
+        pygame.draw.rect(surf, self.PARCHMENT_BORDER,
+                         surf.get_rect(), width=5, border_radius=18)
+        # Corner diamond flourishes
+        for cx, cy in [(14, 14), (self.PARCH_W - 14, 14),
+                       (14, self.PARCH_H - 14), (self.PARCH_W - 14, self.PARCH_H - 14)]:
+            pygame.draw.polygon(surf, self.PARCHMENT_BORDER,
+                                [(cx, cy - 8), (cx + 8, cy),
+                                 (cx, cy + 8), (cx - 8, cy)])
+        return surf
+
+    # ======================================================================
+    # STRENGTH ALGORITHM (educational — fully commented)
+    # ======================================================================
+    @staticmethod
+    def _calculate_strength(pwd: str) -> int:
+        """Score password strength 0-100.
+
+        Points breakdown:
+          length:  5 pts per char, capped at 12 chars       (max 60)
+          variety: 10 pts each for lowercase, uppercase,
+                   digit, and symbol                        (max 40)
+          bonus:  +10 for total length > 8 (longer = better)
+          bonus:  +5  for at least one symbol
+          penalty: -10 for sequential digit runs like '1234' or '9876'
+        Total possible before cap: 115  →  clamped to 0–100.
+        """
+        if not pwd:
+            return 0
+        score = min(len(pwd), 12) * 5
+        has_lower  = any(c.islower() for c in pwd)
+        has_upper  = any(c.isupper() for c in pwd)
+        has_digit  = any(c.isdigit() for c in pwd)
+        has_symbol = any(not c.isalnum() for c in pwd)
+        score += sum([has_lower, has_upper, has_digit, has_symbol]) * 10
+        if len(pwd) > 8:
+            score += 10
+        if has_symbol:
+            score += 5
+        # Penalise obvious sequential digit runs (e.g. "1234", "0987")
+        for i in range(len(pwd) - 3):
+            seg = pwd[i:i + 4]
+            if all(c.isdigit() for c in seg):
+                diffs = [int(seg[j + 1]) - int(seg[j]) for j in range(3)]
+                if all(d == diffs[0] and abs(d) == 1 for d in diffs):
+                    score -= 10
+                    break
+        return max(0, min(100, score))
+
+    # ======================================================================
+    # EDUCATIONAL TOOLTIP
+    # ======================================================================
+    @staticmethod
+    def _get_tooltip(pwd: str) -> str:
+        if not pwd:
+            return "Arrr, type or click a button on the right to start!"
+        has_digit  = any(c.isdigit() for c in pwd)
+        has_symbol = any(not c.isalnum() for c in pwd)
+        has_upper  = any(c.isupper() for c in pwd)
+        length = len(pwd)
+        if length < 4:
+            return "Longer = stronger!  Keep adding characters!"
+        if not has_digit and not has_symbol:
+            return "Good start!  Add a number to boost strength!"
+        if has_digit and not has_symbol:
+            return "Great mix!  Add a symbol like ! or # to be uncrackable!"
+        if not has_upper:
+            return "Mix UPPER and lower case letters to confuse pirates!"
+        if length < 8:
+            return "Almost there!  Longer passwords protect like a bigger cannon!"
+        return "This password be mighty strong — well done, matey!"
+
+    # ======================================================================
+    # ACTIVE PLAYER HELPERS
+    # ======================================================================
+    @property
+    def _active(self):
+        if self._active_idx is not None and 0 <= self._active_idx < len(self._players):
+            return self._players[self._active_idx]
+        return None
+
+    def _select_player(self, idx: int):
+        p = self._players[idx]
+        if p.submitted:
+            return
+        self._active_idx = idx
+        self._sub = "building"
+        self._milestones.clear()
+        self._confetti_done = False
+        # Sync ink display with existing password (no bounce for pre-existing chars)
+        self._ink_chars = [[c, 9999.0] for c in p.password]
+        tip = random.choice(self._VIRGIL_TIPS)
+        self.game.virgil.talk(tip, duration_seconds=3.5)
+        self.scroll_message(f"Building password for {p.name}!", "teaching")
+
+    # ======================================================================
+    # CHARACTER APPENDING
+    # ======================================================================
+    def _append_char(self, kind: str):
+        p = self._active
+        if p is None or p.submitted:
+            return
+        if len(p.password) >= 24:
+            self.game.virgil.talk("That is already a mega-password!", duration_seconds=2.0)
+            return
+        if kind == "letter":
+            ch = random.choice(
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        elif kind == "number":
+            ch = random.choice("0123456789")
+        elif kind == "symbol":
+            ch = random.choice("!@#$%^&*?+-_=~")
+        else:
+            ch = kind  # direct keyboard character
+        p.password += ch
+        self._ink_chars.append([ch, 0.0])
+        p.strength = self._calculate_strength(p.password)
+        self._spawn_sparkles(426, 152, count=8)
+        self.game.audio.play_sfx("click")
+        self._check_milestones(p)
+
+    def _append_char_direct(self, ch: str):
+        if ch.isprintable() and ch not in ("\t", "\n", "\r"):
+            self._append_char(ch)
+
+    def _check_milestones(self, p):
+        virgil = self.game.virgil
+        s = p.strength
+        if s >= 100 and not self._confetti_done:
+            self._confetti_done = True
+            msg = f"TREASURE-SAFE!  No pirate can crack {p.name}'s password!"
+            virgil.cheer()
+            virgil.talk(msg, duration_seconds=4.0)
+            self.scroll_message(msg, "success", important=True)
+            self._spawn_confetti()
+            self.game.audio.play_sfx("confetti")
+            self.game.audio.play_sfx("reward")
+        elif s >= 80 and 80 not in self._milestones:
+            self._milestones.add(80)
+            msg = random.choice(self._VIRGIL_STRONG)
+            virgil.cheer()
+            virgil.talk(msg, duration_seconds=3.0)
+            self.scroll_message(msg, "success")
+        elif s >= 50 and 50 not in self._milestones:
+            self._milestones.add(50)
+            msg = "Getting stronger!  Add a symbol or I'll walk the plank!"
+            virgil.talk(msg, duration_seconds=3.0)
+            self.scroll_message(msg, "teaching")
+        elif s >= 25 and 25 not in self._milestones:
+            self._milestones.add(25)
+            msg = "That's getting stronger, matey!  Keep building!"
+            virgil.talk(msg, duration_seconds=2.5)
+            self.scroll_message(msg, "teaching")
+
+    # ======================================================================
+    # SUBMIT
+    # ======================================================================
+    def _submit_current(self):
+        p = self._active
+        if p is None or p.submitted:
+            return
+        if not p.password:
+            self.game.virgil.talk("Type somethin' first, matey!", duration_seconds=2.0)
+            return
+        p.submitted = True
+        virgil = self.game.virgil
+        if p.strength >= 80:
+            msg = random.choice(self._VIRGIL_STRONG)
+            virgil.cheer()
+            self._spawn_confetti()
+            self.game.audio.play_sfx("reward")
+        elif p.strength >= 40:
+            msg = f"Not bad!  {p.name} scored {p.strength}%!"
+            virgil.talk(msg, duration_seconds=3.0)
+        else:
+            msg = random.choice(self._VIRGIL_WEAK)
+            virgil.laugh()
+            virgil.talk(msg, duration_seconds=3.0)
+        self.scroll_message(msg, "dialogue")
+        self._sub = "done_reaction"
+        # Longer pause before auto-advancing to leaderboard when all done
+        self._reaction_timer = 3.2 if all(pl.submitted for pl in self._players) else 2.2
+        self._active_idx = None
+        self.game.audio.play_sfx("click")
+
+    # ======================================================================
+    # LEADERBOARD
+    # ======================================================================
+    def _enter_leaderboard(self):
+        self._sub = "leaderboard"
+        self._lb_enter_time = pygame.time.get_ticks() / 1000.0
+        self._ranked = sorted(self._players, key=lambda pl: pl.strength, reverse=True)
+        winner = self._ranked[0]
+        self.game.save_manager.record_builder_strength(winner.strength)
+        msg = (f"Captain {winner.name} cracked the strongest password!  "
+               f"Ye get to open the next treasure chest!")
+        self.game.virgil.cheer()
+        self.game.virgil.talk(msg, duration_seconds=6.0)
+        self.scroll_message(msg, "success", important=True)
+        self.game.audio.play_sfx("reward")
+
+    # ======================================================================
+    # PARTICLES
+    # ======================================================================
+    def _spawn_sparkles(self, x, y, count=12):
+        for _ in range(count):
+            angle = random.uniform(0, math.pi * 2)
+            speed = random.uniform(25, 130)
+            self._sparkles.append(Particle(
+                x=x, y=y,
+                vx=math.cos(angle) * speed,
+                vy=math.sin(angle) * speed,
+                size=random.uniform(2, 5),
+                life=random.uniform(0.4, 0.9),
+                max_life=0.9,
+                color=random.choice([GOLD, WHITE, YELLOW]),
+                gravity=30,
+            ))
+
+    def _spawn_confetti(self):
+        for _ in range(100):
+            self._confetti.append(Particle(
+                x=random.uniform(165, 680),
+                y=random.uniform(40, 160),
+                vx=random.uniform(-90, 90),
+                vy=random.uniform(-60, 180),
+                size=random.uniform(4, 8),
+                life=random.uniform(1.6, 3.0),
+                max_life=3.0,
+                color=random.choice([RED, YELLOW, GREEN, BLUE, ORANGE, WHITE]),
+                gravity=280,
+            ))
+
+    # ======================================================================
+    # HANDLE_EVENT
+    # ======================================================================
+    def handle_event(self, event):
+        # ── Rename text-input mode ────────────────────────────────────────
+        if self._rename_idx is not None:
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    name = self._rename_text.strip() or f"Pirate {self._rename_idx + 1}"
+                    self._players[self._rename_idx].name = name[:12]
+                    self._rename_idx = None
+                    self._rename_text = ""
+                elif event.key == pygame.K_ESCAPE:
+                    self._rename_idx = None
+                    self._rename_text = ""
+                elif event.key == pygame.K_BACKSPACE:
+                    self._rename_text = self._rename_text[:-1]
+                elif event.unicode and event.unicode.isprintable():
+                    if len(self._rename_text) < 12:
+                        self._rename_text += event.unicode
+            return
+
+        # ── Intro: any interaction advances to player-select ─────────────
+        if self._sub == "intro":
+            if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+                self._sub = "building"
+            return
+
+        # ── Leaderboard ───────────────────────────────────────────────────
+        if self._sub == "leaderboard":
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self._btn_menu.clicked(event.pos):
+                    self.game.audio.play_sfx("click")
+                    self.game.switch_scene("landing")
+                elif self._btn_next.clicked(event.pos):
+                    self.game.audio.play_sfx("click")
+                    self.game.switch_scene("landing")
+                elif self._btn_again.clicked(event.pos):
+                    self.game.audio.play_sfx("click")
+                    self.enter()
+            return
+
+        # ── Keyboard input while building ────────────────────────────────
+        if event.type == pygame.KEYDOWN:
+            if self._sub == "building" and self._active is not None:
+                if event.key == pygame.K_BACKSPACE:
+                    p = self._active
+                    if p.password:
+                        p.password = p.password[:-1]
+                        if self._ink_chars:
+                            self._ink_chars.pop()
+                        p.strength = self._calculate_strength(p.password)
+                        self.game.audio.play_sfx("click")
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    self._submit_current()
+                elif event.key == pygame.K_ESCAPE:
+                    p = self._active
+                    p.password = ""
+                    p.strength = 0
+                    self._ink_chars.clear()
+                    self._milestones.clear()
+                    self._confetti_done = False
+                    self.game.audio.play_sfx("click")
+                elif event.unicode:
+                    self._append_char_direct(event.unicode)
+            return
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            pos = event.pos
+
+            # ── Back to menu ───────────────────────────────────────────────
+            if self._btn_menu.clicked(pos):
+                self.game.audio.play_sfx("click")
+                self.game.switch_scene("landing")
+                return
+
+            slot_rects, add_rect = self._slot_rects()
+
+            # ── Player slots ──────────────────────────────────────────────
+            for i, rect in enumerate(slot_rects):
+                if rect.collidepoint(pos):
+                    if not self._players[i].submitted:
+                        self._select_player(i)
+                    return
+
+            # ── Add-player button ─────────────────────────────────────────
+            if add_rect and add_rect.collidepoint(pos):
+                if len(self._players) < self.MAX_PLAYERS:
+                    n = len(self._players) + 1
+                    self._players.append(_PlayerEntry(f"Pirate {n}"))
+                    self.game.audio.play_sfx("click")
+                return
+
+            if self._sub != "building":
+                return
+
+            # ── Category buttons ──────────────────────────────────────────
+            if self._btn_letter.clicked(pos):
+                self._spawn_sparkles(
+                    self._btn_letter.rect.centerx,
+                    self._btn_letter.rect.centery, 14)
+                self._append_char("letter")
+                return
+            if self._btn_number.clicked(pos):
+                self._spawn_sparkles(
+                    self._btn_number.rect.centerx,
+                    self._btn_number.rect.centery, 14)
+                self._append_char("number")
+                return
+            if self._btn_symbol.clicked(pos):
+                self._spawn_sparkles(
+                    self._btn_symbol.rect.centerx,
+                    self._btn_symbol.rect.centery, 14)
+                self._append_char("symbol")
+                return
+
+            # ── Action bar ────────────────────────────────────────────────
+            if self._btn_undo.clicked(pos):
+                p = self._active
+                if p and p.password:
+                    p.password = p.password[:-1]
+                    if self._ink_chars:
+                        self._ink_chars.pop()
+                    p.strength = self._calculate_strength(p.password)
+                    self.game.audio.play_sfx("click")
+                return
+            if self._btn_clear.clicked(pos):
+                p = self._active
+                if p:
+                    p.password = ""
+                    p.strength = 0
+                    self._ink_chars.clear()
+                    self._milestones.clear()
+                    self._confetti_done = False
+                    self.game.virgil.talk(
+                        "Fresh start, captain!", duration_seconds=2.0)
+                    self.game.audio.play_sfx("click")
+                return
+            if self._btn_done.clicked(pos):
+                self._submit_current()
+                return
+            if self._btn_end.clicked(pos):
+                self._enter_leaderboard()
+                return
+
+    # ======================================================================
+    # UPDATE
+    # ======================================================================
+    def update(self, dt):
+        # Age ink characters
+        for item in self._ink_chars:
+            item[1] += dt
+
+        # Update particles
+        self._sparkles = [p for p in self._sparkles if p.update(dt) or p.alive()]
+        self._confetti = [p for p in self._confetti if p.update(dt) or p.alive()]
+
+        # done_reaction timer
+        if self._sub == "done_reaction":
+            self._reaction_timer -= dt
+            if self._reaction_timer <= 0:
+                if all(pl.submitted for pl in self._players):
+                    self._enter_leaderboard()
+                else:
+                    self._sub = "building"
+
+        # Leaderboard winner sparkle drizzle
+        if self._sub == "leaderboard" and random.random() < dt * 20:
+            self._spawn_sparkles(
+                random.randint(36, 840), random.randint(105, 165), count=3)
+
+    # ======================================================================
+    # SLOT RECTS HELPER
+    # ======================================================================
+    def _slot_rects(self):
+        """Return (list_of_slot_rects, add_button_rect_or_None)."""
+        slot_h = min(82, max(50, (HEIGHT - 180) // max(1, len(self._players))))
+        start_y = 76
+        rects = [
+            pygame.Rect(4, start_y + i * (slot_h + 6), self.LEFT_W - 8, slot_h)
+            for i in range(len(self._players))
+        ]
+        add_rect = None
+        if len(self._players) < self.MAX_PLAYERS:
+            ay = start_y + len(self._players) * (slot_h + 6) + 2
+            add_rect = pygame.Rect(8, ay, self.LEFT_W - 16, 36)
+        return rects, add_rect
+
+    # ======================================================================
+    # DRAW
+    # ======================================================================
+    def draw(self, screen):
+        t = pygame.time.get_ticks() / 1000.0
+        self.draw_world(t)
+
+        if self._sub == "leaderboard":
+            self._draw_leaderboard(screen, t)
+            return
+
+        self._draw_left_panel(screen)
+        self._draw_center(screen, t)
+        self._draw_right_panel(screen, t)
+        self._draw_action_bar(screen, t)
+        # Back to menu button
+        self._btn_menu.draw(screen, self.game.fonts, t,
+                            mouse_pos=self.game.mouse_virtual_pos)
+        # Virgil sits to the right of the right panel
+        self.game.virgil.set_position(840, 420)
+        self.game.virgil.draw(screen)
+        self.draw_particles(self._sparkles)
+        self.draw_particles(self._confetti)
+
+    # ── Left panel ────────────────────────────────────────────────────────
+    def _draw_left_panel(self, screen):
+        panel = pygame.Rect(0, 52, self.LEFT_W, HEIGHT - 52)
+        pygame.draw.rect(screen, (44, 28, 14), panel)
+        pygame.draw.rect(screen, (130, 90, 45), panel, width=3)
+        draw_text_outline(screen, "CREW", self.game.fonts.tiny,
+                          GOLD, BLACK, (self.LEFT_W // 2, 63), center=True)
+
+        slot_rects, add_rect = self._slot_rects()
+        for i, rect in enumerate(slot_rects):
+            p = self._players[i]
+            if i == self._active_idx:
+                color, border = self.SLOT_ACTIVE, (200, 160, 40)
+            elif p.submitted:
+                color, border = self.SLOT_DONE, (60, 150, 70)
+            else:
+                color, border = self.SLOT_IDLE, (100, 75, 40)
+
+            pygame.draw.rect(screen, color, rect, border_radius=10)
+            pygame.draw.rect(screen, border, rect, width=3, border_radius=10)
+
+            if self._rename_idx == i:
+                draw_text_outline(screen, self._rename_text + "|",
+                                  self.game.fonts.tiny, BLACK, WHITE,
+                                  rect.center, center=True)
+                continue
+
+            name_y = rect.top + rect.height // 3
+            draw_text_outline(screen, p.name[:10], self.game.fonts.tiny,
+                              BLACK, WHITE, (rect.centerx, name_y), center=True)
+
+            if p.submitted:
+                sc = GREEN if p.strength >= 80 else (YELLOW if p.strength >= 50 else RED)
+                draw_text_outline(screen, f"{p.strength}%", self.game.fonts.small,
+                                  sc, BLACK,
+                                  (rect.centerx, name_y + 30), center=True)
+            else:
+                status = "active \u2192" if i == self._active_idx else "tap to pick"
+                draw_text_outline(screen, status, self.game.fonts.tiny,
+                                  (70, 50, 25), WHITE,
+                                  (rect.centerx, name_y + 28), center=True)
+
+        if add_rect:
+            pygame.draw.rect(screen, (80, 65, 38), add_rect, border_radius=8)
+            pygame.draw.rect(screen, (130, 90, 45), add_rect, width=2, border_radius=8)
+            draw_text_outline(screen, "+ Add Pirate", self.game.fonts.tiny,
+                              GOLD, BLACK, add_rect.center, center=True)
+
+    # ── Center stage ──────────────────────────────────────────────────────
+    def _draw_center(self, screen, t):
+        if self._parchment:
+            screen.blit(self._parchment, (self.PARCH_X, self.PARCH_Y))
+
+        p = self._active
+
+        # Title
+        if self._sub == "intro":
+            title = "The Password Crew Challenge"
+        elif p:
+            title = f"Building: {p.name}"
+        else:
+            title = "\u2190 Pick a pirate to begin!"
+        draw_text_outline(screen, title, self.game.fonts.small, GOLD, BLACK,
+                          (426, 72), center=True)
+
+        # Password display box
+        box = pygame.Rect(self.PARCH_X + 10, self.PWD_BOX_Y,
+                          self.PARCH_W - 20, self.PWD_BOX_H)
+        pygame.draw.rect(screen, WHITE, box, border_radius=14)
+        pygame.draw.rect(screen, BLACK, box, width=4, border_radius=14)
+
+        pwd = p.password if p else ""
+        if pwd:
+            self._draw_password_ink(screen, box, pwd)
+        else:
+            hint = "\u2190 pick a pirate" if not p else "type or click \u2192"
+            draw_text_outline(screen, hint, self.game.fonts.small,
+                              (160, 140, 100), BLACK, box.center, center=True)
+
+        # Strength bar with animated ship
+        bx = self.PARCH_X + 10
+        by = self.BAR_Y
+        bw = self.PARCH_W - 20
+        bh = self.BAR_H
+        strength = p.strength if p else 0
+        self._draw_strength_bar(screen, bx, by, bw, bh, strength, t)
+
+        # Educational tooltip
+        tip = self._get_tooltip(pwd)
+        draw_text_outline(screen, tip, self.game.fonts.tiny,
+                          (80, 55, 25), (255, 235, 180),
+                          (426, self.TIP_Y), center=True)
+
+    def _draw_password_ink(self, screen, box, pwd):
+        """Render each character with a per-char bounce on first appearance."""
+        font = self.game.fonts.med
+        # Approximate mono-style character width
+        char_w = font.size("M")[0]
+        max_chars = max(1, (box.width - 24) // char_w)
+        if len(pwd) > max_chars:
+            display = list(pwd[-max_chars:])
+            ink_slice = self._ink_chars[-max_chars:]
+        else:
+            display = list(pwd)
+            ink_slice = self._ink_chars[:len(pwd)]
+
+        total_w = len(display) * char_w
+        start_x = box.centerx - total_w // 2
+        cy = box.centery
+
+        for i, ch in enumerate(display):
+            age = ink_slice[i][1] if i < len(ink_slice) else 9999.0
+            # Bounce: scale 2.0 → 1.0 over the first 0.25 seconds
+            scale = 1.0 + max(0.0, 1.0 - age / 0.25)
+            char_surf = font.render(ch, True, DARK_BLUE)
+            if scale > 1.02:
+                new_w = max(1, int(char_surf.get_width() * scale))
+                new_h = max(1, int(char_surf.get_height() * scale))
+                char_surf = pygame.transform.scale(char_surf, (new_w, new_h))
+            rect = char_surf.get_rect(center=(start_x + char_w // 2, cy))
+            screen.blit(char_surf, rect)
+            start_x += char_w
+
+    def _draw_strength_bar(self, screen, bx, by, bw, bh, strength, t):
+        # Background track (parchment-toned)
+        pygame.draw.rect(screen, (200, 185, 148),
+                         (bx - 4, by - 4, bw + 8, bh + 8), border_radius=14)
+        pygame.draw.rect(screen, (100, 80, 45),
+                         (bx - 4, by - 4, bw + 8, bh + 8),
+                         width=3, border_radius=14)
+        pygame.draw.rect(screen, (155, 135, 98),
+                         (bx, by, bw, bh), border_radius=12)
+
+        # Filled portion — red → yellow → green
+        fill = int(bw * strength / 100)
+        if fill > 0:
+            s = strength / 100.0
+            if s < 0.5:
+                r, g, b = 230, int(80 + 175 * (s / 0.5)), 50
+            else:
+                r = int(230 - 154 * ((s - 0.5) / 0.5))
+                g = int(255 - 59  * ((s - 0.5) / 0.5))
+                b = int(50  + 40  * ((s - 0.5) / 0.5))
+            pygame.draw.rect(screen, (r, g, b),
+                             (bx, by, fill, bh), border_radius=12)
+
+        # Strength label inside bar
+        lc = GREEN if strength >= 80 else (YELLOW if strength >= 50 else WHITE)
+        label = (f"Strength: {strength}%"
+                 if strength < 100 else "TREASURE-SAFE!  * 100%")
+        draw_text_outline(screen, label, self.game.fonts.tiny, lc, BLACK,
+                          (bx + bw // 2, by + bh // 2), center=True)
+
+        # Animated pirate ship sailing along the bar
+        ship_x = bx + max(14, min(bw - 14, fill))
+        ship_y = by - 16
+        self._draw_mini_ship(screen, ship_x, ship_y, t)
+
+    @staticmethod
+    def _draw_mini_ship(screen, cx, cy, t):
+        """A tiny bobbing pirate ship that marks current strength."""
+        bob = int(math.sin(t * 3.5) * 2)
+        cy += bob
+        # Hull polygon
+        hull = [(cx - 14, cy + 8), (cx + 14, cy + 8),
+                (cx + 10, cy + 16), (cx - 10, cy + 16)]
+        pygame.draw.polygon(screen, (101, 65, 35), hull)
+        pygame.draw.polygon(screen, BLACK, hull, 1)
+        # Mast
+        pygame.draw.line(screen, (80, 55, 25), (cx, cy + 8), (cx, cy - 12), 2)
+        # Sail
+        sail = [(cx, cy - 12), (cx + 13, cy - 2), (cx, cy + 5)]
+        pygame.draw.polygon(screen, WHITE, sail)
+        pygame.draw.polygon(screen, (180, 160, 120), sail, 1)
+        # Tiny skull on flag
+        pygame.draw.circle(screen, BLACK, (cx - 1, cy - 14), 3)
+
+    # ── Right panel ───────────────────────────────────────────────────────
+    def _draw_right_panel(self, screen, t):
+        mouse = self.game.mouse_virtual_pos
+        enabled = self._sub == "building" and self._active is not None
+        for btn in (self._btn_letter, self._btn_number, self._btn_symbol):
+            btn.enabled = enabled
+            btn.draw(screen, self.game.fonts, t, mouse_pos=mouse)
+        draw_text_outline(screen, "or type on keyboard",
+                          self.game.fonts.tiny, (200, 180, 130), BLACK,
+                          (790, 388), center=True)
+
+    # ── Action bar ────────────────────────────────────────────────────────
+    def _draw_action_bar(self, screen, t):
+        mouse = self.game.mouse_virtual_pos
+        has_pwd = (self._active is not None
+                   and bool(self._active.password)
+                   and self._sub == "building")
+        self._btn_undo.enabled  = has_pwd
+        self._btn_clear.enabled = has_pwd
+        self._btn_done.enabled  = has_pwd
+        self._btn_end.enabled   = any(pl.submitted for pl in self._players)
+        for btn in (self._btn_undo, self._btn_clear, self._btn_done, self._btn_end):
+            btn.draw(screen, self.game.fonts, t, mouse_pos=mouse)
+
+    # ======================================================================
+    # LEADERBOARD DRAW
+    # ======================================================================
+    def _draw_leaderboard(self, screen, t):
+        self.draw_particles(self._sparkles)
+        self.draw_particles(self._confetti)
+
+        # Darkened overlay so the panel pops
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 110))
+        screen.blit(overlay, (0, 0))
+
+        # Main parchment panel
+        panel = pygame.Rect(28, 28, 844, 448)
+        pygame.draw.rect(screen, self.PARCHMENT_BG, panel, border_radius=22)
+        pygame.draw.rect(screen, self.PARCHMENT_BORDER, panel, width=5, border_radius=22)
+
+        draw_text_outline(screen, "THE PASSWORD LEADERBOARD",
+                          self.game.fonts.big, GOLD, BLACK,
+                          (WIDTH // 2, 70), center=True)
+        draw_text_outline(screen,
+                          "Arrr, mateys — the strongest password wins!",
+                          self.game.fonts.tiny, (100, 70, 30), BLACK,
+                          (WIDTH // 2, 108), center=True)
+
+        medal_colors = [self.MEDAL_GOLD, self.MEDAL_SILVER, self.MEDAL_BRONZE]
+        medal_labels = ["1st", "2nd", "3rd", "4th", "5th"]
+        entry_h = 70
+        start_y = 126
+        gap = 8
+        elapsed = t - self._lb_enter_time
+
+        for rank, p in enumerate(self._ranked):
+            delay = rank * 0.3
+            progress = max(0.0, min(1.0, (elapsed - delay) / 0.45))
+            ease = progress * progress * (3.0 - 2.0 * progress)  # smoothstep
+
+            target_x = 48
+            cur_x = int(-780 + ease * (target_x + 780))
+            ry = start_y + rank * (entry_h + gap)
+
+            row = pygame.Rect(cur_x, ry, 800, entry_h)
+            bg = (255, 248, 215) if rank == 0 else (242, 242, 250)
+            pygame.draw.rect(screen, bg, row, border_radius=14)
+            mc = medal_colors[min(rank, 2)]
+            pygame.draw.rect(screen, mc, row, width=4, border_radius=14)
+
+            # Medal circle
+            pygame.draw.circle(screen, mc,
+                                (cur_x + 38, ry + entry_h // 2), 24)
+            pygame.draw.circle(screen, BLACK,
+                                (cur_x + 38, ry + entry_h // 2), 24, 2)
+            draw_text_outline(screen,
+                              medal_labels[min(rank, len(medal_labels) - 1)],
+                              self.game.fonts.tiny, BLACK, mc,
+                              (cur_x + 38, ry + entry_h // 2), center=True)
+
+            # Name
+            nc = (140, 90, 10) if rank == 0 else BLACK
+            draw_text_outline(screen, p.name, self.game.fonts.small, nc, WHITE,
+                              (cur_x + 76, ry + entry_h // 2), center=False)
+
+            # Masked password preview (first 4 chars then stars)
+            shown = (p.password[:4] + "*" * max(0, len(p.password) - 4)
+                     if p.password else "(none)")
+            draw_text_outline(screen, shown, self.game.fonts.tiny,
+                              (80, 60, 120), WHITE,
+                              (cur_x + 300, ry + entry_h // 2), center=False)
+
+            # Mini strength bar
+            mbx = cur_x + 530
+            mby = ry + (entry_h - 22) // 2
+            mbw, mbh = 188, 22
+            pygame.draw.rect(screen, (180, 165, 140),
+                             (mbx, mby, mbw, mbh), border_radius=8)
+            mfill = int(mbw * p.strength / 100)
+            if mfill > 0:
+                sv = p.strength / 100.0
+                gr = int(80 + 175 * min(sv, 0.5) / 0.5) if sv < 0.5 else \
+                     int(255 - 59 * (sv - 0.5) / 0.5)
+                rr = 230 if sv < 0.5 else int(230 - 154 * (sv - 0.5) / 0.5)
+                pygame.draw.rect(screen, (rr, gr, 50),
+                                 (mbx, mby, mfill, mbh), border_radius=8)
+            draw_text_outline(screen, f"{p.strength}%",
+                              self.game.fonts.tiny, WHITE, BLACK,
+                              (mbx + mbw // 2, mby + mbh // 2), center=True)
+
+            # Crown emoji bouncing above winner entry
+            if rank == 0 and ease >= 1.0:
+                crown_bob = int(math.sin(t * 4.5) * 3)
+                draw_text_outline(screen, "WINNER!", self.game.fonts.tiny,
+                                  GOLD, BLACK,
+                                  (cur_x + 760, ry + 16 + crown_bob),
+                                  center=True)
+
+        # Buttons
+        mouse = self.game.mouse_virtual_pos
+        self._btn_next.draw(screen, self.game.fonts, t, mouse_pos=mouse)
+        self._btn_again.draw(screen, self.game.fonts, t, mouse_pos=mouse)
+
+        # Virgil
+        self.game.virgil.set_position(850, 390)
+        self.game.virgil.draw(screen)
 
 
 class ParentReportScene(BaseScene):

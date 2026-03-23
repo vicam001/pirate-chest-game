@@ -358,6 +358,10 @@ class AudioManager:
         self.sfx["cannon_boom"] = self._load_or_tone("assets/audio/sfx/cannon_boom.wav", 60, 0.4)
         self.sfx["sparkle"] = self._load_or_tone("assets/audio/sfx/sparkle.wav", 1800, 0.15)
 
+        # Cinematic intro music (procedural — drop a real WAV to override)
+        self.intro_music: pygame.mixer.Sound | None = self._load_or_custom(
+            "assets/audio/music/intro_cinematic.wav", self._generate_intro_music)
+
         music_path = self.root_dir / "assets/audio/music/island_loop.wav"
         if music_path.exists():
             try:
@@ -393,6 +397,128 @@ class AudioManager:
             wave = math.sin(2 * math.pi * freq * i / MIXER_FREQUENCY)
             value = int(32767 * amplitude * env * wave)
             buf.append(value)
+        return pygame.mixer.Sound(buffer=buf.tobytes())
+
+    def _generate_intro_music(self):
+        """Procedural cinematic intro theme (~9 s).
+
+        Structure:
+          0-2 s  — Deep ocean drone, mysterious low brass
+          2-4 s  — Rising string swell, compass reveal feel
+          4-6 s  — Grand fanfare chord hit (major triad)
+          6-8 s  — Sustain with shimmer overtones
+          8-9 s  — Gentle fade out
+        """
+        dur = 9.0
+        sr = MIXER_FREQUENCY
+        samples = int(sr * dur)
+        buf = array("h")
+
+        # Frequencies for a D-major inspired progression
+        # Phase 1-2: D2 drone (73.4 Hz) + A2 (110 Hz)
+        # Phase 3-4: D-major fanfare: D4(293.7) + F#4(370) + A4(440)
+        # Phase 5: add D5(587.3) shimmer
+
+        for i in range(samples):
+            t = i / sr
+            value = 0.0
+
+            # --- Master envelope ---
+            if t < 0.3:
+                master = t / 0.3  # fade in
+            elif t > 8.0:
+                master = max(0.0, 1.0 - (t - 8.0) / 1.0)  # fade out
+            else:
+                master = 1.0
+
+            # === Phase 1 (0–2 s): Deep drone ===
+            if t < 2.5:
+                phase1_env = min(1.0, t / 1.0)
+                if t > 1.8:
+                    phase1_env *= max(0.0, 1.0 - (t - 1.8) / 0.7)
+                # Low D drone
+                drone = (
+                    math.sin(2 * math.pi * 73.42 * t)
+                    + 0.5 * math.sin(2 * math.pi * 110.0 * t)
+                    + 0.3 * math.sin(2 * math.pi * 146.83 * t)
+                )
+                # Gentle pulsing (ocean-like)
+                pulse = 0.7 + 0.3 * math.sin(2 * math.pi * 0.8 * t)
+                value += drone * phase1_env * pulse * 0.12
+
+            # === Phase 2 (1.5–4 s): Rising swell ===
+            if 1.5 < t < 4.5:
+                p2 = (t - 1.5) / 3.0
+                phase2_env = p2 ** 1.5  # accelerating rise
+                if t > 3.8:
+                    phase2_env *= max(0.0, 1.0 - (t - 3.8) / 0.7)
+                # Rising pitch: sweep from ~147 Hz up to ~294 Hz
+                sweep_freq = 146.83 + p2 * 146.83
+                swell = (
+                    math.sin(2 * math.pi * sweep_freq * t)
+                    + 0.6 * math.sin(2 * math.pi * sweep_freq * 1.5 * t)
+                    + 0.3 * math.sin(2 * math.pi * sweep_freq * 2.0 * t)
+                )
+                # String-like tremolo
+                tremolo = 0.85 + 0.15 * math.sin(2 * math.pi * 5.5 * t)
+                value += swell * phase2_env * tremolo * 0.10
+
+            # === Phase 3 (3.5–8 s): Grand fanfare chord ===
+            if t > 3.5:
+                p3 = (t - 3.5) / 0.3
+                # Sharp attack, long sustain
+                if p3 < 1.0:
+                    phase3_env = p3 ** 0.3  # fast attack
+                elif t < 7.0:
+                    phase3_env = 1.0
+                else:
+                    phase3_env = max(0.0, 1.0 - (t - 7.0) / 1.5)
+
+                # D-major triad: D4 + F#4 + A4
+                fanfare = (
+                    math.sin(2 * math.pi * 293.66 * t)
+                    + 0.85 * math.sin(2 * math.pi * 369.99 * t)
+                    + 0.75 * math.sin(2 * math.pi * 440.0 * t)
+                )
+                # Octave doubling for richness
+                fanfare += (
+                    0.4 * math.sin(2 * math.pi * 146.83 * t)  # D3
+                    + 0.3 * math.sin(2 * math.pi * 587.33 * t)  # D5
+                )
+                # Warm harmonics (odd partials for brass feel)
+                fanfare += (
+                    0.15 * math.sin(2 * math.pi * 293.66 * 3 * t)
+                    + 0.08 * math.sin(2 * math.pi * 440.0 * 2 * t)
+                )
+                value += fanfare * phase3_env * 0.09
+
+            # === Phase 4 (5–8 s): Shimmer overlay ===
+            if 5.0 < t < 8.5:
+                p4 = (t - 5.0) / 1.0
+                phase4_env = min(1.0, p4)
+                if t > 7.5:
+                    phase4_env *= max(0.0, 1.0 - (t - 7.5) / 1.0)
+                # High shimmering tones
+                shimmer = (
+                    0.3 * math.sin(2 * math.pi * 1174.66 * t)  # D6
+                    + 0.2 * math.sin(2 * math.pi * 880.0 * t)   # A5
+                )
+                # Gentle amplitude modulation for sparkle
+                sparkle = 0.6 + 0.4 * math.sin(2 * math.pi * 7.0 * t)
+                value += shimmer * phase4_env * sparkle * 0.04
+
+            # === Sub-bass throughout (felt, not heard on small speakers) ===
+            if t < 7.0:
+                sub_env = min(1.0, t / 2.0)
+                if t > 5.5:
+                    sub_env *= max(0.0, 1.0 - (t - 5.5) / 1.5)
+                value += math.sin(2 * math.pi * 36.71 * t) * sub_env * 0.06
+
+            # Apply master envelope and clamp
+            value *= master
+            sample = int(32767 * max(-1.0, min(1.0, value)))
+            buf.append(sample)
+
         return pygame.mixer.Sound(buffer=buf.tobytes())
 
     def _coin_clink(self):
@@ -440,6 +566,19 @@ class AudioManager:
     def stop_music(self):
         if self.available and self.music_channel is not None:
             self.music_channel.stop()
+
+    def play_intro_music(self):
+        """Play the cinematic intro theme on the music channel (no loop)."""
+        if not self.available or self.intro_music is None or self.music_channel is None:
+            return
+        self.music_channel.stop()
+        self.music_channel.play(self.intro_music, loops=0)
+
+    def stop_intro_music(self):
+        """Stop the intro music (if playing) with a quick fade."""
+        if not self.available or self.music_channel is None:
+            return
+        self.music_channel.fadeout(800)
 
     def play_sfx(self, name):
         if not self.available:

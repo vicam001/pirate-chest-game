@@ -86,13 +86,15 @@ def wrap_text(text, font, max_width):
 
 
 class Button:
-    def __init__(self, rect, label, color, hover, text_color=WHITE, pulse=True):
+    def __init__(self, rect, label, color, hover, text_color=WHITE, pulse=True,
+                 font_attr="med"):
         self.rect = pygame.Rect(rect)
         self.label = label
         self.color = color
         self.hover = hover
         self.text_color = text_color
         self.pulse = pulse
+        self.font_attr = font_attr  # FontBook attribute: "huge","big","med","small","tiny"
         self.visible = True
         self.enabled = True
 
@@ -115,7 +117,8 @@ class Button:
         pygame.draw.rect(surface, glow, draw_rect.inflate(10, 10), border_radius=22)
         pygame.draw.rect(surface, color, draw_rect, border_radius=20)
         pygame.draw.rect(surface, BLACK, draw_rect, width=4, border_radius=20)
-        draw_text_outline(surface, self.label, fonts.med, self.text_color, BLACK, draw_rect.center, center=True)
+        font = getattr(fonts, self.font_attr, fonts.med)
+        draw_text_outline(surface, self.label, font, self.text_color, BLACK, draw_rect.center, center=True)
 
     def clicked(self, pos):
         return self.visible and self.enabled and self.rect.collidepoint(pos)

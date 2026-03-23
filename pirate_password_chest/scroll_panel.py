@@ -120,6 +120,10 @@ class ScrollPanel:
     """The Ancient Pirate Scroll — single source of truth for all game text."""
 
     def __init__(self) -> None:
+        # When True, draws only a slim decorative strip at the bottom so
+        # scenes that need more vertical space can collapse the scroll.
+        self.collapsed: bool = False
+
         # Messages queue (newest first)
         self._messages: list[_ScrollMessage] = []
 
@@ -229,6 +233,10 @@ class ScrollPanel:
 
     def draw(self, surface: pygame.Surface, t: float) -> None:
         """Draw the scroll panel at screen bottom."""
+        if self.collapsed:
+            self._draw_collapsed(surface, t)
+            return
+
         # Draw cached parchment background
         if self._bg_cache is not None:
             surface.blit(self._bg_cache, (SCROLL_X, SCROLL_Y))
@@ -253,6 +261,55 @@ class ScrollPanel:
     def has_messages(self) -> bool:
         """True if any visible messages."""
         return len(self._messages) > 0
+
+    # === COLLAPSED (SLIM STRIP) MODE ===
+
+    def _draw_collapsed(self, surface: pygame.Surface, t: float) -> None:
+        """Draw a 28 px decorative parchment strip at the very bottom.
+
+        This lets scenes that need extra vertical space suppress the full
+        150 px scroll panel while keeping a visual anchor at the screen edge.
+        """
+        strip_h = 28
+        strip_y = HEIGHT - strip_h
+
+        # Parchment fill
+        pygame.draw.rect(surface, PARCHMENT_BASE,
+                         (0, strip_y, WIDTH, strip_h))
+
+        # Subtle gradient (lighter → darker top → bottom)
+        for dy in range(strip_h):
+            p = dy / max(1, strip_h - 1)
+            r = int(PARCHMENT_LIGHT[0] * (1 - p) + PARCHMENT_DARK[0] * p)
+            g = int(PARCHMENT_LIGHT[1] * (1 - p) + PARCHMENT_DARK[1] * p)
+            b = int(PARCHMENT_LIGHT[2] * (1 - p) + PARCHMENT_DARK[2] * p)
+            pygame.draw.line(surface, (r, g, b),
+                             (4, strip_y + dy), (WIDTH - 4, strip_y + dy))
+
+        # Animated top edge (torn parchment curl)
+        curl_phase = t * 1.5
+        points = []
+        for bx, base_tear in self._tear_points:
+            curl = math.sin(curl_phase + bx * 0.032) * 1.5
+            sy = strip_y + 4 + base_tear + int(curl)
+            points.append((bx, sy))
+        if len(points) >= 2:
+            pygame.draw.lines(surface, TEAR_EDGE, False, points, 2)
+            shadow_pts = [(px, py + 2) for px, py in points]
+            pygame.draw.lines(surface, (*CURL_SHADOW, 70), False, shadow_pts, 1)
+
+        # Gold top border line
+        glow = int(190 + 65 * math.sin(t * 2.0))
+        border_col = (min(255, glow), min(255, int(glow * 0.82)), int(glow * 0.25))
+        pygame.draw.line(surface, border_col, (0, strip_y + 2), (WIDTH, strip_y + 2), 3)
+
+        # Corner diamond flourishes
+        for cx in (12, WIDTH - 12):
+            cy = strip_y + strip_h // 2
+            size = 5
+            diamond = [(cx, cy - size), (cx + size, cy),
+                       (cx, cy + size), (cx - size, cy)]
+            pygame.draw.polygon(surface, border_col, diamond)
 
     # === BACKGROUND CACHE ===
 

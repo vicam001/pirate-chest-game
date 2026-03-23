@@ -46,16 +46,17 @@ Let them answer. The correct answer is: **You do NOT tell them!**
 Say: "That's right! Pirates never give their name to strangers. Your name, your school, your address -- that's YOUR treasure. Keep it secret!"
 
 **Question 2 -- The Captain asks:**
-> "Which password is harder to crack: Sun$et#42! or Pepito?"
-
-Let them guess. The answer is **Sun$et#42!**
-Say: "See all those weird symbols and numbers? That makes it super hard for bad guys to guess. 'Pepito' is way too easy!"
-
-**Question 3 -- Ghostly Gibbs asks:**
 > "Someone online asks for your home address. What do you do?"
 
 Let them answer. Correct: **You keep it secret!**
-Say: "Ghostly Gibbs did not protect his secrets... and now he's a GHOST! Don't be like Gibbs!"
+Say: "Skeleton Johnny did not protect his secrets... and now he's a SKELETON! Don't be like Johnny!"
+
+
+**Question 3 -- Virgil asks:**
+> "Which password is harder to crack: Sun$et#42! or Virgil?"
+
+Let them guess. The answer is **Sun$et#42!**
+Say: "See all those weird symbols and numbers? That makes it super hard for bad guys to guess. 'Virgil' is way too easy!"
 
 *(The ship arrives at the island. Cheer with the kids!)*
 
